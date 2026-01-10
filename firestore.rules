@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated and has a profile
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to get user role
+    function getUserRole() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) ?
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role : null;
+    }
+
+    // Helper function to check if user is admin or super_admin
+    function isAdmin() {
+      return getUserRole() in ['admin', 'super_admin'];
+    }
+
+    // Helper function to check if user is super_admin
+    function isSuperAdmin() {
+      return getUserRole() == 'super_admin';
+    }
+
+    // Users collection - role-based access
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin() && resource.data.role != 'super_admin';
+    }
+
+    // Pending users collection - for registration approval
+    match /pending_users/{pendingId} {
+      allow read: if isAuthenticated() && isAdmin();
+      allow create: if true; // Allow anonymous registration requests
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Pending organizations collection
+    match /pending_organizations/{pendingId} {
+      allow read: if isAdmin();
+      allow create: if true; // Allow anonymous organization requests
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Organizations collection
+    match /organizations/{orgId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Tasks collection - user and admin access
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.assignedTo == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.assignedTo == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // Receipts collection - user and admin access
+    match /receipts/{receiptId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.uploadedBy == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.uploadedBy == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // Files collection - user and admin access
+    match /files/{fileId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.uploadedBy == request.auth.uid);
+      allow delete: if isAuthenticated() && (isAdmin() || resource.data.uploadedBy == request.auth.uid);
+    }
+
+    // Audit logs - admin read only
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false; // Server-side only
+    }
+
+    // Messages collection - authenticated users
+    match /messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.senderId);
+      allow delete: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.senderId);
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.userId);
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.userId);
+      allow delete: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.userId);
+    }
+
+    // Sync metadata - user-specific
+    match /sync_metadata/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
