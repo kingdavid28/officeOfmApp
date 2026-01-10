@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Domain Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .output {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .success {
+            color: green;
+        }
+
+        .error {
+            color: red;
+        }
+
+        .warning {
+            color: orange;
+        }
+
+        .step {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔧 Firebase Auth Domain Fix</h1>
+
+    <div class="container">
+        <h2>Current Environment</h2>
+        <div id="env-info"></div>
+    </div>
+
+    <div class="container">
+        <h2>Quick Tests</h2>
+        <button onclick="testCurrentConfig()">Test Current Config</button>
+        <button onclick="testWithLocalhost()">Test with Localhost Auth Domain</button>
+        <button onclick="testFirebaseHosting()">Test Firebase Hosting Connectivity</button>
+        <button onclick="showFixInstructions()">Show Fix Instructions</button>
+    </div>
+
+    <div class="container">
+        <h2>Output</h2>
+        <div id="output" class="output">Ready to test...</div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, GoogleAuthProvider, signInWithRedirect } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        // Original config
+        const originalConfig = {
+            apiKey: "AIzaSyDy4jBqxKpD_B6SGAqRLyTrmGxQ9rEA0zw",
+            authDomain: "officeofmapp.firebaseapp.com",
+            projectId: "officeofmapp",
+            storageBucket: "officeofmapp.firebasestorage.app",
+            messagingSenderId: "710263745328",
+            appId: "1:710263745328:web:a41ed7f9f6df52970db6f5"
+        };
+
+        // Alternative config for localhost testing
+        const localhostConfig = {
+            ...originalConfig,
+            authDomain: "localhost"
+        };
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : '';
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function showEnvironmentInfo() {
+            const envInfo = document.getElementById('env-info');
+            envInfo.innerHTML = `
+                <p><strong>Current URL:</strong> ${window.location.href}</p>
+                <p><strong>Hostname:</strong> ${window.location.hostname}</p>
+                <p><strong>Port:</strong> ${window.location.port}</p>
+                <p><strong>Protocol:</strong> ${window.location.protocol}</p>
+                <p><strong>Origin:</strong> ${window.location.origin}</p>
+            `;
+        }
+
+        window.testCurrentConfig = async function () {
+            log('=== Testing Current Firebase Config ===');
+
+            try {
+                const app = initializeApp(originalConfig, 'test-original');
+                const auth = getAuth(app);
+
+                log('✅ Firebase initialized with original config', 'success');
+                log(`Auth domain: ${originalConfig.authDomain}`);
+
+                // Test Google provider creation
+                const provider = new GoogleAuthProvider();
+                log('✅ Google provider created', 'success');
+
+                // Test redirect (this will likely fail)
+                log('🚀 Testing redirect (this may fail)...', 'warning');
+                try {
+                    await signInWithRedirect(auth, provider);
+                    log('✅ Redirect initiated successfully', 'success');
+                } catch (error) {
+                    log(`❌ Redirect failed: ${error.message}`, 'error');
+                    log(`Error code: ${error.code}`, 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Config test failed: ${error.message}`, 'error');
+            }
+        };
+
+        window.testWithLocalhost = async function () {
+            log('=== Testing with Localhost Auth Domain ===');
+
+            try {
+                const app = initializeApp(localhostConfig, 'test-localhost');
+                const auth = getAuth(app);
+
+                log('✅ Firebase initialized with localhost config', 'success');
+                log(`Auth domain: ${localhostConfig.authDomain}`);
+
+                const provider = new GoogleAuthProvider();
+                log('✅ Google provider created', 'success');
+
+                log('🚀 Testing redirect with localhost...', 'warning');
+                try {
+                    await signInWithRedirect(auth, provider);
+                    log('✅ Redirect initiated successfully', 'success');
+                } catch (error) {
+                    log(`❌ Redirect failed: ${error.message}`, 'error');
+                    log(`Error code: ${error.code}`, 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Localhost config test failed: ${error.message}`, 'error');
+            }
+        };
+
+        window.testFirebaseHosting = async function () {
+            log('=== Testing Firebase Hosting Connectivity ===');
+
+            const testUrls = [
+                `https://${originalConfig.authDomain}/__/firebase/init.json`,
+                `https://${originalConfig.authDomain}/__/firebase/init.js`,
+                `https://${originalConfig.authDomain}/`,
+            ];
+
+            for (const url of testUrls) {
+                try {
+                    log(`Testing: ${url}`);
+                    const response = await fetch(url, { mode: 'no-cors' });
+                    log(`✅ ${url} - Response received`, 'success');
+                } catch (error) {
+                    log(`❌ ${url} - ${error.message}`, 'error');
+                }
+            }
+        };
+
+        window.showFixInstructions = function () {
+            log('=== Fix Instructions ===');
+            log('');
+            log('🔧 SOLUTION 1: Update Firebase Console (Recommended)');
+            log('1. Go to https://console.firebase.google.com/');
+            log('2. Select project: officeofmapp');
+            log('3. Go to Authentication > Settings > Authorized domains');
+            log('4. Add these domains:');
+            log('   - localhost');
+            log('   - 127.0.0.1');
+            log('   - localhost:5174');
+            log('   - 127.0.0.1:5174');
+            log('');
+            log('🔧 SOLUTION 2: Use Firebase Hosting for Development');
+            log('1. Build your project: npm run build');
+            log('2. Serve with Firebase: firebase serve --only hosting');
+            log('3. Access via the Firebase hosting URL');
+            log('');
+            log('🔧 SOLUTION 3: Temporary Environment Fix');
+            log('Update your .env file:');
+            log('VITE_FIREBASE_AUTH_DOMAIN=localhost');
+            log('');
+            log('⚠️ After making changes, restart your development server!');
+        };
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            showEnvironmentInfo();
+            log('Environment info loaded. Click buttons to test configurations.');
+        });
+    </script>
+</body>
+
+</html>
