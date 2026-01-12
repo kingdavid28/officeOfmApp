@@ -30,6 +30,7 @@ export interface UserProfile {
   lastLogin: Date;
   approvedBy?: string;
   approvedAt?: Date;
+  assignedAdminId?: string; // For staff members - which admin they belong to
 }
 
 export const authService = {
@@ -154,7 +155,7 @@ export const authService = {
     return !snapshot.empty;
   },
 
-  async createGoogleUserRequest(email: string, name: string, role: UserRole) {
+  async createGoogleUserRequest(email: string, name: string, role: UserRole, requestedAdminId?: string) {
     // Check if user already has a pending request
     const existingPending = await this.checkExistingPendingRequest(email);
     if (existingPending) {
@@ -167,14 +168,15 @@ export const authService = {
       role,
       requestedAt: new Date(),
       status: 'pending',
-      authProvider: 'google'
+      authProvider: 'google',
+      requestedAdminId: role === 'staff' ? requestedAdminId : undefined
     };
 
     const docRef = await addDoc(collection(db, 'pending_users'), pendingUser);
     return docRef.id;
   },
 
-  async requestUserCreation(email: string, name: string, role: UserRole = 'staff') {
+  async requestUserCreation(email: string, name: string, role: UserRole = 'staff', requestedAdminId?: string) {
     if (role === 'super_admin') {
       throw new Error('Super admin accounts cannot be requested');
     }
@@ -191,7 +193,8 @@ export const authService = {
       role,
       requestedAt: new Date(),
       status: 'pending',
-      authProvider: 'email'
+      authProvider: 'email',
+      requestedAdminId: role === 'staff' ? requestedAdminId : undefined
     };
 
     const docRef = await addDoc(collection(db, 'pending_users'), pendingUser);
@@ -199,6 +202,16 @@ export const authService = {
   },
 
   async approveGoogleUser(pendingUserId: string, approverUid: string) {
+    // SECURITY: Admins can approve staff, Super admins can approve all roles
+    const approverProfile = await this.getUserProfile(approverUid);
+    if (!approverProfile) {
+      throw new Error('Approver profile not found');
+    }
+
+    if (approverProfile.role !== 'admin' && approverProfile.role !== 'super_admin') {
+      throw new Error('Only administrators and super administrators can approve user accounts');
+    }
+
     const pendingDoc = await getDoc(doc(db, 'pending_users', pendingUserId));
     if (!pendingDoc.exists()) {
       throw new Error('Pending user not found');
@@ -213,6 +226,16 @@ export const authService = {
       throw new Error('This method is only for Google users');
     }
 
+    // SECURITY: Regular admins can only approve staff accounts
+    if (approverProfile.role === 'admin' && pendingUser.role !== 'staff') {
+      throw new Error('Administrators can only approve staff accounts. Contact a super admin to approve administrator accounts.');
+    }
+
+    // SECURITY: Only super admins can approve admin and super admin accounts
+    if ((pendingUser.role === 'admin' || pendingUser.role === 'super_admin') && approverProfile.role !== 'super_admin') {
+      throw new Error('Only super administrators can approve administrator and super administrator accounts');
+    }
+
     // For Google users, we create the profile without creating a Firebase Auth account
     // since they'll authenticate through Google OAuth
     const profile: UserProfile = {
@@ -223,7 +246,8 @@ export const authService = {
       createdAt: new Date(),
       lastLogin: new Date(),
       approvedBy: approverUid,
-      approvedAt: new Date()
+      approvedAt: new Date(),
+      assignedAdminId: pendingUser.role === 'staff' ? (pendingUser.requestedAdminId || approverUid) : undefined
     };
 
     // Store in a separate collection for pre-approved Google users
@@ -235,9 +259,21 @@ export const authService = {
       approvedBy: approverUid,
       approvedAt: new Date()
     });
+
+    console.log(`Google user approved: ${pendingUser.email} with role ${pendingUser.role} by ${approverProfile.email} (${approverProfile.role})`);
   },
 
   async approveUser(pendingUserId: string, password: string, approverUid: string) {
+    // SECURITY: Admins can approve staff, Super admins can approve all roles
+    const approverProfile = await this.getUserProfile(approverUid);
+    if (!approverProfile) {
+      throw new Error('Approver profile not found');
+    }
+
+    if (approverProfile.role !== 'admin' && approverProfile.role !== 'super_admin') {
+      throw new Error('Only administrators and super administrators can approve user accounts');
+    }
+
     const pendingDoc = await getDoc(doc(db, 'pending_users', pendingUserId));
     if (!pendingDoc.exists()) {
       throw new Error('Pending user not found');
@@ -246,6 +282,16 @@ export const authService = {
     const pendingUser = pendingDoc.data() as PendingUser;
     if (pendingUser.status !== 'pending') {
       throw new Error('User request already processed');
+    }
+
+    // SECURITY: Regular admins can only approve staff accounts
+    if (approverProfile.role === 'admin' && pendingUser.role !== 'staff') {
+      throw new Error('Administrators can only approve staff accounts. Contact a super admin to approve administrator accounts.');
+    }
+
+    // SECURITY: Only super admins can approve admin and super admin accounts
+    if ((pendingUser.role === 'admin' || pendingUser.role === 'super_admin') && approverProfile.role !== 'super_admin') {
+      throw new Error('Only super administrators can approve administrator and super administrator accounts');
     }
 
     // Store current user to restore later
@@ -264,7 +310,8 @@ export const authService = {
         createdAt: new Date(),
         lastLogin: new Date(),
         approvedBy: approverUid,
-        approvedAt: new Date()
+        approvedAt: new Date(),
+        assignedAdminId: pendingUser.role === 'staff' ? (pendingUser.requestedAdminId || approverUid) : undefined
       };
 
       await setDoc(doc(db, 'users', result.user.uid), profile);
@@ -337,8 +384,31 @@ export const authService = {
   },
 
   async deleteUser(userId: string, deletedBy: string) {
+    // SECURITY: Get the user profile first to check permissions
+    const userProfile = await this.getUserProfile(userId);
+    if (!userProfile) {
+      throw new Error('User not found');
+    }
+
+    // SECURITY: Super admin accounts cannot be deleted for security reasons
+    if (userProfile.role === 'super_admin') {
+      throw new Error('Super administrator accounts cannot be deleted for security reasons');
+    }
+
+    // SECURITY: Only super admins can delete admin accounts
+    const deleterProfile = await this.getUserProfile(deletedBy);
+    if (!deleterProfile) {
+      throw new Error('Deleter profile not found');
+    }
+
+    if (userProfile.role === 'admin' && deleterProfile.role !== 'super_admin') {
+      throw new Error('Only super administrators can delete administrator accounts');
+    }
+
     // Delete user profile
     await deleteDoc(doc(db, 'users', userId));
+
+    console.log(`User deleted: ${userProfile.email} by ${deleterProfile.email}`);
 
     // Note: Firebase Auth user deletion requires admin SDK on server
     // This only deletes the Firestore profile
@@ -354,6 +424,31 @@ export const authService = {
       throw new Error('No authenticated user. Please sign in first.');
     }
 
+    // SECURITY: Admins can create staff, Super admins can create all roles
+    const creatorProfile = await this.getUserProfile(createdBy);
+    if (!creatorProfile) {
+      throw new Error('Creator profile not found');
+    }
+
+    if (creatorProfile.role !== 'admin' && creatorProfile.role !== 'super_admin') {
+      throw new Error('Only administrators and super administrators can create user accounts');
+    }
+
+    // SECURITY: Regular admins can only create staff accounts
+    if (creatorProfile.role === 'admin' && role !== 'staff') {
+      throw new Error('Administrators can only create staff accounts. Contact a super admin to create administrator accounts.');
+    }
+
+    // SECURITY: Only super admins can create admin and super admin accounts
+    if ((role === 'admin' || role === 'super_admin') && creatorProfile.role !== 'super_admin') {
+      throw new Error('Only super administrators can create administrator and super administrator accounts');
+    }
+
+    // SECURITY: Additional validation for super admin creation
+    if (role === 'super_admin') {
+      console.log(`Super admin account creation requested by: ${creatorProfile.email}`);
+    }
+
     try {
       // Create the user account (this will sign in the new user automatically)
       const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -366,10 +461,13 @@ export const authService = {
         createdAt: new Date(),
         lastLogin: new Date(),
         approvedBy: createdBy,
-        approvedAt: new Date()
+        approvedAt: new Date(),
+        assignedAdminId: role === 'staff' ? createdBy : undefined
       };
 
       await setDoc(doc(db, 'users', result.user.uid), profile);
+
+      console.log(`User account created: ${email} with role ${role} by ${creatorProfile.email} (${creatorProfile.role})`);
 
       // Sign out the newly created user
       await signOut(auth);
@@ -418,6 +516,44 @@ export const authService = {
   async getAllUsers(): Promise<UserProfile[]> {
     const snapshot = await getDocs(collection(db, 'users'));
     return snapshot.docs.map(doc => doc.data() as UserProfile);
+  },
+
+  async getVisibleUsers(requestingUserRole: UserRole): Promise<UserProfile[]> {
+    const allUsers = await this.getAllUsers();
+
+    // SECURITY: Only super admins can see other super admins
+    // Regular admins cannot see super admin accounts for security reasons
+    if (requestingUserRole !== 'super_admin') {
+      return allUsers.filter(user => user.role !== 'super_admin');
+    }
+
+    return allUsers;
+  },
+
+  async getAdminUsers(): Promise<UserProfile[]> {
+    const q = query(collection(db, 'users'), where('role', '==', 'admin'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data() as UserProfile);
+  },
+
+  async getStaffForAdmin(adminId: string): Promise<UserProfile[]> {
+    const q = query(
+      collection(db, 'users'),
+      where('role', '==', 'staff'),
+      where('assignedAdminId', '==', adminId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data() as UserProfile);
+  },
+
+  async getPendingUsersForAdmin(adminId: string): Promise<PendingUser[]> {
+    const q = query(
+      collection(db, 'pending_users'),
+      where('status', '==', 'pending'),
+      where('requestedAdminId', '==', adminId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PendingUser));
   },
 
   async initializeSuperAdmin() {

@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
-import { UserRole } from '../../lib/auth';
-import { Shield, User, Settings, X, CheckCircle } from 'lucide-react';
+import { UserRole, UserProfile, authService } from '../../lib/auth';
+import { Shield, User, Settings, X, CheckCircle, Users } from 'lucide-react';
 
 interface GoogleRoleSelectionModalProps {
     isOpen: boolean;
     userEmail: string;
     userName: string;
-    onRoleSelect: (role: UserRole) => void;
+    onRoleSelect: (role: UserRole, selectedAdminId?: string) => void;
     onCancel: () => void;
     loading?: boolean;
 }
@@ -23,6 +23,30 @@ export const GoogleRoleSelectionModal: React.FC<GoogleRoleSelectionModalProps> =
     loading = false
 }) => {
     const [selectedRole, setSelectedRole] = useState<UserRole>('staff');
+    const [selectedAdminId, setSelectedAdminId] = useState<string>('');
+    const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
+    const [loadingAdmins, setLoadingAdmins] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            loadAdminUsers();
+        }
+    }, [isOpen]);
+
+    const loadAdminUsers = async () => {
+        setLoadingAdmins(true);
+        try {
+            const admins = await authService.getAdminUsers();
+            setAdminUsers(admins);
+            if (admins.length > 0) {
+                setSelectedAdminId(admins[0].uid); // Default to first admin
+            }
+        } catch (error) {
+            console.error('Error loading admin users:', error);
+        } finally {
+            setLoadingAdmins(false);
+        }
+    };
 
     if (!isOpen) return null;
 
@@ -30,7 +54,7 @@ export const GoogleRoleSelectionModal: React.FC<GoogleRoleSelectionModalProps> =
         {
             value: 'staff' as UserRole,
             label: 'Staff Member',
-            description: 'Basic access to tasks, receipts, and files',
+            description: 'Basic access to tasks, receipts, and files. Will be assigned to a specific administrator.',
             icon: User,
             color: 'text-blue-600',
             bgColor: 'bg-blue-50',
@@ -48,11 +72,11 @@ export const GoogleRoleSelectionModal: React.FC<GoogleRoleSelectionModalProps> =
     ];
 
     const handleSubmit = () => {
-        onRoleSelect(selectedRole);
+        onRoleSelect(selectedRole, selectedRole === 'staff' ? selectedAdminId : undefined);
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" >
             <Card className="w-full max-w-md shadow-xl">
                 <CardHeader className="relative">
                     <button
@@ -94,8 +118,8 @@ export const GoogleRoleSelectionModal: React.FC<GoogleRoleSelectionModalProps> =
                                     <div
                                         key={role.value}
                                         className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${isSelected
-                                                ? `${role.borderColor} ${role.bgColor}`
-                                                : 'border-gray-200 hover:border-gray-300'
+                                            ? `${role.borderColor} ${role.bgColor}`
+                                            : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                         onClick={() => setSelectedRole(role.value)}
                                     >
@@ -133,10 +157,70 @@ export const GoogleRoleSelectionModal: React.FC<GoogleRoleSelectionModalProps> =
                         </div>
                     </div>
 
+                    {selectedRole === 'staff' && (
+                        <div>
+                            <Label className="text-sm font-medium text-gray-700 mb-3 block">
+                                Select the administrator you'd like to work under:
+                            </Label>
+
+                            {loadingAdmins ? (
+                                <div className="p-4 text-center text-gray-500">
+                                    Loading administrators...
+                                </div>
+                            ) : adminUsers.length === 0 ? (
+                                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <p className="text-sm text-yellow-800">
+                                        No administrators available. Your request will be assigned to the approving administrator.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {adminUsers.map((admin) => (
+                                        <div
+                                            key={admin.uid}
+                                            className={`relative cursor-pointer rounded-lg border-2 p-3 transition-all ${selectedAdminId === admin.uid
+                                                ? 'border-blue-200 bg-blue-50'
+                                                : 'border-gray-200 hover:border-gray-300'
+                                                }`}
+                                            onClick={() => setSelectedAdminId(admin.uid)}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-lg ${selectedAdminId === admin.uid ? 'bg-blue-100' : 'bg-gray-50'}`}>
+                                                    <Users className={`w-4 h-4 ${selectedAdminId === admin.uid ? 'text-blue-600' : 'text-gray-600'}`} />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h3 className={`font-medium ${selectedAdminId === admin.uid ? 'text-blue-900' : 'text-gray-900'}`}>
+                                                        {admin.name}
+                                                    </h3>
+                                                    <p className="text-sm text-gray-600">
+                                                        {admin.email}
+                                                    </p>
+                                                </div>
+                                                <input
+                                                    type="radio"
+                                                    name="admin"
+                                                    value={admin.uid}
+                                                    checked={selectedAdminId === admin.uid}
+                                                    onChange={() => setSelectedAdminId(admin.uid)}
+                                                    className="w-4 h-4 text-blue-600"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                         <p className="text-sm text-yellow-800">
                             <strong>Note:</strong> Your request will be reviewed by an administrator.
-                            Administrator requests require additional approval.
+                            {selectedRole === 'staff' && selectedAdminId && (
+                                <span> You will be assigned to {adminUsers.find(a => a.uid === selectedAdminId)?.name}.</span>
+                            )}
+                            {selectedRole === 'admin' && (
+                                <span> Administrator requests require additional approval.</span>
+                            )}
                         </p>
                     </div>
 
@@ -159,6 +243,6 @@ export const GoogleRoleSelectionModal: React.FC<GoogleRoleSelectionModalProps> =
                     </div>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 };

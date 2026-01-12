@@ -50,6 +50,7 @@ export interface PendingUser {
   approvedAt?: Date;
   rejectionReason?: string;
   authProvider?: 'email' | 'google';
+  requestedAdminId?: string; // For staff requests - which admin they want to be assigned to
 }
 
 export interface AuditLog {

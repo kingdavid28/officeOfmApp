@@ -181,17 +181,18 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSucces
     }
   };
 
-  const handleRoleSelect = async (role: UserRole) => {
+  const handleRoleSelect = async (role: UserRole, selectedAdminId?: string) => {
     if (!pendingGoogleUser) return;
 
     setLoading(true);
     try {
-      console.log(`Creating Google user request for ${pendingGoogleUser.email} with role ${role}`);
+      console.log(`Creating Google user request for ${pendingGoogleUser.email} with role ${role}${selectedAdminId ? ` assigned to admin ${selectedAdminId}` : ''}`);
 
       await authService.createGoogleUserRequest(
         pendingGoogleUser.email,
         pendingGoogleUser.name,
-        role
+        role,
+        selectedAdminId
       );
 
       console.log('Google user request created successfully');
