@@ -12,6 +12,7 @@ import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { TaskManager } from './components/TaskManager';
 import { ReceiptManager } from './components/ReceiptManager';
+import { EnhancedReceiptManager } from './components/EnhancedReceiptManager';
 import { FileManager } from './components/FileManager';
 import { EmployeeDirectory } from './components/EmployeeDirectory';
 import MessagingPage from './components/MessagingPage';
@@ -108,7 +109,12 @@ function AppContent() {
       case 'tasks':
         return <TaskManager />;
       case 'receipts':
-        return <ReceiptManager />;
+        return (
+          <EnhancedReceiptManager
+            currentUserId={userProfile.uid}
+            userRole={userProfile.role}
+          />
+        );
       case 'files':
         return <FileManager />;
       case 'employees':
