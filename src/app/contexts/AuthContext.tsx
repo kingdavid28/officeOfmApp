@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
 import { authService, UserProfile } from '../../lib/auth';
 import { useToast } from '../hooks/useToast';
+import { appInitialization } from '../../lib/app-initialization';
 import '../../utils/debug-profile'; // Import debug utilities
 
 interface AuthContextType {
@@ -149,6 +150,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   setAuthError(null);
                   await authService.updateLastLogin(user.uid);
 
+                  // Initialize app components (categories, etc.)
+                  await appInitialization.initializeApp();
+
                   console.log('User successfully authenticated with pre-approved profile:', {
                     email: profile.email,
                     role: profile.role,
@@ -196,6 +200,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Profile found, set it and clear any auth errors
           setUserProfile(profile);
           setAuthError(null);
+
+          // Initialize app components (categories, etc.)
+          await appInitialization.initializeApp();
 
           console.log('User successfully authenticated with profile:', {
             email: profile.email,
