@@ -116,7 +116,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const isGoogleUser = user.providerData.some(provider => provider.providerId === 'google.com');
 
             if (isGoogleUser) {
-              console.log('Google user without profile detected - this might be a new user who just completed role selection');
+              console.log('Google user without profile detected - checking if user is pre-approved');
+
+              // First check if user is pre-approved for Google sign-in
+              try {
+                const { getDoc, doc, setDoc, deleteDoc } = await import('firebase/firestore');
+                const { db } = await import('../../lib/firebase');
+
+                const approvedGoogleDoc = await getDoc(doc(db, 'approved_google_users', user.email!));
+
+                if (approvedGoogleDoc.exists()) {
+                  console.log('Pre-approved Google user found in AuthContext, creating profile');
+                  const approvedData = approvedGoogleDoc.data() as UserProfile;
+
+                  // Create the actual user profile with the real UID
+                  const profile: UserProfile = {
+                    ...approvedData,
+                    uid: user.uid,
+                    name: user.displayName || approvedData.name,
+                    lastLogin: new Date()
+                  };
+
+                  await setDoc(doc(db, 'users', user.uid), profile);
+
+                  // Remove from pre-approved collection
+                  await deleteDoc(doc(db, 'approved_google_users', user.email!));
+
+                  console.log('Pre-approved user profile created successfully in AuthContext');
+
+                  // Set the profile and continue with normal flow
+                  setUserProfile(profile);
+                  setAuthError(null);
+                  await authService.updateLastLogin(user.uid);
+
+                  console.log('User successfully authenticated with pre-approved profile:', {
+                    email: profile.email,
+                    role: profile.role,
+                    name: profile.name
+                  });
+
+                  setLoading(false);
+                  return;
+                }
+              } catch (approvedError) {
+                console.error('Error checking pre-approved users in AuthContext:', approvedError);
+                // Continue with normal flow if pre-approved check fails
+              }
 
               // Check if user has pending request
               try {
