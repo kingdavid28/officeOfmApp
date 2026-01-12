@@ -31,6 +31,7 @@ export interface UserProfile {
   approvedBy?: string;
   approvedAt?: Date;
   assignedAdminId?: string; // For staff members - which admin they belong to
+  updatedAt?: Date; // For tracking profile updates
 }
 
 export const authService = {
@@ -603,6 +604,30 @@ export const authService = {
 
   async updateLastLogin(uid: string) {
     await setDoc(doc(db, 'users', uid), { lastLogin: new Date() }, { merge: true });
+  },
+
+  async updateUserProfile(uid: string, updates: Partial<UserProfile>) {
+    // Security: Only allow updating certain fields
+    const allowedFields = ['name'];
+    const filteredUpdates: any = {};
+
+    for (const field of allowedFields) {
+      if (updates[field as keyof UserProfile] !== undefined) {
+        filteredUpdates[field] = updates[field as keyof UserProfile];
+      }
+    }
+
+    if (Object.keys(filteredUpdates).length === 0) {
+      throw new Error('No valid fields to update');
+    }
+
+    // Add update metadata
+    filteredUpdates.updatedAt = new Date();
+
+    await setDoc(doc(db, 'users', uid), filteredUpdates, { merge: true });
+
+    console.log(`User profile updated: ${uid}`, filteredUpdates);
+    return filteredUpdates;
   },
 
   onAuthStateChange(callback: (user: User | null) => void) {
