@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { EditUserRoleModal } from './EditUserRoleModal';
-import { Edit3 } from 'lucide-react';
+import { EditProfileModal } from './EditProfileModal';
+import { Edit3, Settings } from 'lucide-react';
 import { debugAuthState } from '../../utils/debug-auth';
 
 interface RealAdminPanelProps {
@@ -18,6 +19,7 @@ export const RealAdminPanel: React.FC<RealAdminPanelProps> = ({ currentUserUid, 
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
+  const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createUserData, setCreateUserData] = useState({
@@ -29,6 +31,7 @@ export const RealAdminPanel: React.FC<RealAdminPanelProps> = ({ currentUserUid, 
   const [creating, setCreating] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -60,6 +63,7 @@ export const RealAdminPanel: React.FC<RealAdminPanelProps> = ({ currentUserUid, 
       }
 
       console.log('User profile verified:', userProfile.role);
+      setCurrentUserProfile(userProfile);
 
       // Load data based on user role
       if (userRole === 'super_admin') {
@@ -284,7 +288,28 @@ export const RealAdminPanel: React.FC<RealAdminPanelProps> = ({ currentUserUid, 
     setEditingUser(null);
   };
 
-  if (loading) return <div>Loading admin panel...</div>;
+  const handleProfileUpdate = (updatedProfile: UserProfile) => {
+    setCurrentUserProfile(updatedProfile);
+    // Optionally reload data to reflect changes
+    loadData();
+  };
+
+  const handleEditProfile = () => {
+    setShowEditProfileModal(true);
+  };
+
+  const handleCloseEditProfileModal = () => {
+    setShowEditProfileModal(false);
+  };
+
+  if (loading || !currentUserProfile) return (
+    <div className="flex items-center justify-center p-8">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+        <p className="text-gray-600">Loading admin panel...</p>
+      </div>
+    </div>
+  );
 
   // Function to render tab content
   const renderTabContent = () => {
@@ -847,13 +872,39 @@ export const RealAdminPanel: React.FC<RealAdminPanelProps> = ({ currentUserUid, 
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">
-          {userRole === 'super_admin' ? 'Super Admin Panel' : 'Admin Panel'}
-        </h2>
-        <p className="text-muted-foreground">
-          Manage users and system settings
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">
+            {userRole === 'super_admin' ? 'Super Admin Panel' : 'Admin Panel'}
+            {currentUserProfile && (
+              <span className="text-lg font-medium text-gray-600 ml-2">
+                - {currentUserProfile.name}
+              </span>
+            )}
+          </h2>
+          <p className="text-muted-foreground">
+            {currentUserProfile ? (
+              <>
+                Welcome back, <span className="font-medium">{currentUserProfile.name}</span> ({currentUserProfile.email}) •
+                Manage users and system settings
+              </>
+            ) : (
+              'Manage users and system settings'
+            )}
+          </p>
+        </div>
+
+        {currentUserProfile && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleEditProfile}
+            className="flex items-center gap-2"
+          >
+            <Settings className="w-4 h-4" />
+            Edit Profile
+          </Button>
+        )}
       </div>
 
       <div className="flex space-x-4 border-b">
@@ -882,6 +933,16 @@ export const RealAdminPanel: React.FC<RealAdminPanelProps> = ({ currentUserUid, 
           currentUserRole={userRole}
           onRoleUpdate={handleRoleUpdate}
           onClose={handleCloseEditModal}
+        />
+      )}
+
+      {/* Edit Profile Modal */}
+      {currentUserProfile && (
+        <EditProfileModal
+          isOpen={showEditProfileModal}
+          userProfile={currentUserProfile}
+          onProfileUpdate={handleProfileUpdate}
+          onClose={handleCloseEditProfileModal}
         />
       )}
     </div>
