@@ -6,7 +6,7 @@ export const appInitialization = {
         try {
             console.log('Initializing application...');
 
-            // Check if we have a super admin user
+            // Check if we have a authenticated user
             const currentUser = authService.getCurrentUser();
             if (!currentUser) {
                 console.log('No authenticated user found, skipping initialization');
@@ -19,8 +19,8 @@ export const appInitialization = {
                 return;
             }
 
-            // Only super admins can initialize the system
-            if (userProfile.role === 'super_admin') {
+            // Allow admins and super admins to initialize categories
+            if (userProfile.role === 'super_admin' || userProfile.role === 'admin') {
                 await this.initializeReceiptCategories(currentUser.uid);
             }
 
