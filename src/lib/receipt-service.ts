@@ -54,13 +54,24 @@ export const receiptService = {
     },
 
     async getCategories(): Promise<ReceiptCategory[]> {
-        const q = query(
-            collection(db, 'receipt_categories'),
-            where('isActive', '==', true),
-            orderBy('name')
-        );
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => doc.data() as ReceiptCategory);
+        try {
+            const q = query(
+                collection(db, 'receipt_categories'),
+                where('isActive', '==', true),
+                orderBy('name')
+            );
+            const snapshot = await getDocs(q);
+            const categories = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as ReceiptCategory));
+
+            console.log(`Loaded ${categories.length} categories from database`);
+            return categories;
+        } catch (error) {
+            console.error('Error loading categories:', error);
+            return [];
+        }
     },
 
     async createCategory(category: Omit<ReceiptCategory, 'id' | 'createdAt'>): Promise<string> {
@@ -220,7 +231,7 @@ export const receiptService = {
         return receipts;
     },
 
-    async getVisibleReceipts(requestingUserId: string, filter?: ReceiptFilter): Promise<Receipt[]> {
+    async getVisibleReceipts(requestingUserId: string, filter?: ReceiptFilter, viewScope?: 'personal' | 'team' | 'all'): Promise<Receipt[]> {
         const userProfile = await authService.getUserProfile(requestingUserId);
         if (!userProfile) {
             throw new Error('User profile not found');
@@ -231,12 +242,23 @@ export const receiptService = {
                 return this.getAllReceipts(requestingUserId, filter);
 
             case 'admin':
-                // Get own receipts + receipts from assigned staff
-                const [ownReceipts, staffReceipts] = await Promise.all([
-                    this.getUserReceipts(requestingUserId, filter),
-                    this.getAdminReceipts(requestingUserId, filter)
-                ]);
-                return [...ownReceipts, ...staffReceipts];
+                // Handle different view scopes for admins
+                switch (viewScope) {
+                    case 'personal':
+                        return this.getUserReceipts(requestingUserId, filter);
+
+                    case 'team':
+                        return this.getAdminReceipts(requestingUserId, filter);
+
+                    case 'all':
+                    default:
+                        // Get own receipts + receipts from assigned staff (default behavior)
+                        const [ownReceipts, staffReceipts] = await Promise.all([
+                            this.getUserReceipts(requestingUserId, filter),
+                            this.getAdminReceipts(requestingUserId, filter)
+                        ]);
+                        return [...ownReceipts, ...staffReceipts];
+                }
 
             case 'staff':
             default:
@@ -299,8 +321,8 @@ export const receiptService = {
     },
 
     // Statistics and Analytics
-    async getReceiptStats(userId: string): Promise<ReceiptStats> {
-        const receipts = await this.getVisibleReceipts(userId);
+    async getReceiptStats(userId: string, viewScope?: 'personal' | 'team' | 'all'): Promise<ReceiptStats> {
+        const receipts = await this.getVisibleReceipts(userId, undefined, viewScope);
 
         const stats: ReceiptStats = {
             totalReceipts: receipts.length,

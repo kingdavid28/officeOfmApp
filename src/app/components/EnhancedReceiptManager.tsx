@@ -21,7 +21,24 @@ import {
     Filter,
     Eye,
     Settings,
-    BarChart3
+    BarChart3,
+    Camera,
+    Brain,
+    Zap,
+    Scan,
+    AlertTriangle,
+    Package,
+    Car,
+    Zap as UtilitiesIcon,
+    Coffee,
+    Monitor,
+    Wrench,
+    Megaphone,
+    GraduationCap,
+    Heart,
+    Scale,
+    Home,
+    HelpCircle
 } from 'lucide-react';
 import {
     Dialog,
@@ -40,6 +57,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { receiptService } from '../../lib/receipt-service';
 import { authService, UserProfile } from '../../lib/auth';
+import { userPreferencesService, ReceiptViewScope } from '../../lib/user-preferences';
+import { AICameraScanModal } from './AICameraScanModal';
+import { AIFinancialDashboard } from './AIFinancialDashboard';
+import { ReceiptViewScopeSelector } from './ReceiptViewScopeSelector';
+import { ScannedReceiptData } from '../../lib/ai-receipt-scanner';
 import {
     Receipt,
     ReceiptCategory,
@@ -64,12 +86,19 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
     const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
+    const [initializingCategories, setInitializingCategories] = useState(false);
+
+    // View scope state
+    const [currentViewScope, setCurrentViewScope] = useState<ReceiptViewScope>('all');
+    const [aiDashboardViewScope, setAIDashboardViewScope] = useState<ReceiptViewScope>('all');
 
     // Modal states
     const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
     const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
     const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
     const [isStatsDialogOpen, setIsStatsDialogOpen] = useState(false);
+    const [isAICameraOpen, setIsAICameraOpen] = useState(false);
+    const [isAIDashboardOpen, setIsAIDashboardOpen] = useState(false);
 
     // Filter states
     const [filter, setFilter] = useState<ReceiptFilter>({});
@@ -94,25 +123,61 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
 
     useEffect(() => {
         loadData();
+        loadUserPreferences();
     }, [currentUserId]);
+
+    useEffect(() => {
+        // Reload data when view scope changes
+        loadData();
+    }, [currentViewScope]);
+
+    const loadUserPreferences = async () => {
+        try {
+            const preferences = await userPreferencesService.getUserPreferences(currentUserId);
+            setCurrentViewScope(preferences.receiptViewScope);
+            setAIDashboardViewScope(preferences.aiDashboardViewScope);
+        } catch (error) {
+            console.error('Error loading user preferences:', error);
+        }
+    };
 
     const loadData = async () => {
         try {
             setLoading(true);
 
             const [receiptsData, categoriesData, userProfile, statsData] = await Promise.all([
-                receiptService.getVisibleReceipts(currentUserId, filter),
+                receiptService.getVisibleReceipts(currentUserId, filter, currentViewScope),
                 receiptService.getCategories(),
                 authService.getUserProfile(currentUserId),
-                receiptService.getReceiptStats(currentUserId)
+                receiptService.getReceiptStats(currentUserId, currentViewScope)
             ]);
 
             setReceipts(receiptsData);
-            setCategories(categoriesData);
             setCurrentUserProfile(userProfile);
             setStats(statsData);
+
+            // Check if categories are empty and try to initialize them
+            if (categoriesData.length === 0 && userProfile && (userProfile.role === 'admin' || userProfile.role === 'super_admin')) {
+                console.log('No categories found, attempting to initialize...');
+                try {
+                    await receiptService.initializeCategories(currentUserId);
+                    // Reload categories after initialization
+                    const newCategoriesData = await receiptService.getCategories();
+                    setCategories(newCategoriesData);
+                    console.log('Categories initialized successfully');
+                } catch (initError) {
+                    console.error('Failed to initialize categories:', initError);
+                    setCategories(categoriesData); // Set empty array
+                }
+            } else {
+                setCategories(categoriesData);
+            }
         } catch (error) {
             console.error('Error loading receipt data:', error);
+            // Set empty arrays to prevent undefined errors
+            setReceipts([]);
+            setCategories([]);
+            setStats(null);
         } finally {
             setLoading(false);
         }
@@ -228,6 +293,32 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
         }
     };
 
+    const handleAIScanComplete = (scannedData: ScannedReceiptData, imageFile: File) => {
+        // Pre-fill form with AI-extracted data
+        setFormData({
+            title: scannedData.extractedData.vendor || 'AI Scanned Receipt',
+            description: `Scanned receipt from ${scannedData.extractedData.vendor || 'unknown vendor'}`,
+            amount: scannedData.extractedData.amount?.toString() || '',
+            categoryId: categories.find(c => c.name === scannedData.suggestedCategory)?.id || '',
+            type: 'unofficial',
+            date: scannedData.extractedData.date || new Date().toISOString().split('T')[0],
+            tags: 'ai-scanned',
+            vendor: scannedData.extractedData.vendor || '',
+            invoiceNumber: scannedData.extractedData.invoiceNumber || '',
+            taxAmount: scannedData.extractedData.taxAmount?.toString() || '',
+            notes: `AI Confidence: ${Math.round(scannedData.confidence)}%`
+        });
+
+        // Set the scanned image
+        setSelectedFile(imageFile);
+        const url = URL.createObjectURL(imageFile);
+        setPreviewUrl(url);
+
+        // Open upload dialog with pre-filled data
+        setIsAICameraOpen(false);
+        setIsUploadDialogOpen(true);
+    };
+
     const handleApprove = async (receiptId: string) => {
         try {
             await receiptService.approveReceipt(receiptId, currentUserId);
@@ -263,6 +354,34 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
         }
     };
 
+    const handleViewScopeChange = async (newScope: ReceiptViewScope) => {
+        try {
+            setCurrentViewScope(newScope);
+            await userPreferencesService.updateReceiptViewScope(currentUserId, newScope);
+        } catch (error) {
+            console.error('Error updating view scope:', error);
+        }
+    };
+
+    const handleAIDashboardViewScopeChange = async (newScope: ReceiptViewScope) => {
+        try {
+            setAIDashboardViewScope(newScope);
+            await userPreferencesService.updateAIDashboardViewScope(currentUserId, newScope);
+        } catch (error) {
+            console.error('Error updating AI dashboard view scope:', error);
+        }
+    };
+
+    const handleSetAsDefaultView = async (scope: ReceiptViewScope) => {
+        try {
+            await userPreferencesService.updateDefaultReceiptView(currentUserId, scope);
+            alert('Default view updated successfully!');
+        } catch (error) {
+            console.error('Error setting default view:', error);
+            alert('Error updating default view');
+        }
+    };
+
     const getStatusIcon = (status: ReceiptStatus) => {
         switch (status) {
             case 'approved': return <CheckCircle className="w-4 h-4 text-green-600" />;
@@ -275,6 +394,37 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
         return type === 'official' ?
             <Shield className="w-4 h-4 text-blue-600" /> :
             <FileText className="w-4 h-4 text-gray-600" />;
+    };
+
+    const getCategoryIcon = (categoryName: string) => {
+        switch (categoryName) {
+            case 'Office Supplies':
+                return <Package className="w-4 h-4" />;
+            case 'Transportation':
+                return <Car className="w-4 h-4" />;
+            case 'Utilities':
+                return <UtilitiesIcon className="w-4 h-4" />;
+            case 'Meals & Entertainment':
+                return <Coffee className="w-4 h-4" />;
+            case 'Equipment':
+                return <Monitor className="w-4 h-4" />;
+            case 'Services':
+                return <Wrench className="w-4 h-4" />;
+            case 'Marketing & Advertising':
+                return <Megaphone className="w-4 h-4" />;
+            case 'Training & Education':
+                return <GraduationCap className="w-4 h-4" />;
+            case 'Medical & Health':
+                return <Heart className="w-4 h-4" />;
+            case 'Legal & Compliance':
+                return <Scale className="w-4 h-4" />;
+            case 'Maintenance & Repairs':
+                return <Home className="w-4 h-4" />;
+            case 'Other':
+                return <HelpCircle className="w-4 h-4" />;
+            default:
+                return <Tag className="w-4 h-4" />;
+        }
     };
 
     const filteredReceipts = receipts.filter(receipt => {
@@ -317,16 +467,45 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {stats && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setIsStatsDialogOpen(true)}
-                        >
-                            <BarChart3 className="w-4 h-4 mr-2" />
-                            Statistics
-                        </Button>
+                    {/* View Scope Selector for Admins */}
+                    {userRole === 'admin' && (
+                        <ReceiptViewScopeSelector
+                            currentScope={currentViewScope}
+                            userRole={userRole}
+                            onScopeChange={handleViewScopeChange}
+                            onSetAsDefault={handleSetAsDefaultView}
+                            showSetAsDefault={true}
+                        />
                     )}
+
+                    {stats && (
+                        <>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsAIDashboardOpen(true)}
+                            >
+                                <Brain className="w-4 h-4 mr-2" />
+                                AI Insights
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsStatsDialogOpen(true)}
+                            >
+                                <BarChart3 className="w-4 h-4 mr-2" />
+                                Statistics
+                            </Button>
+                        </>
+                    )}
+
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsAICameraOpen(true)}
+                    >
+                        <Camera className="mr-2 h-4 w-4" />
+                        AI Scan
+                    </Button>
 
                     <Dialog open={isUploadDialogOpen} onOpenChange={(open) => {
                         setIsUploadDialogOpen(open);
@@ -345,34 +524,58 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 {/* File Upload */}
                                 <div className="space-y-2">
-                                    <Label htmlFor="receipt-file">Receipt File *</Label>
-                                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                                    <Label htmlFor="receipt-file" className="text-sm font-medium">
+                                        Receipt File *
+                                    </Label>
+                                    <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${previewUrl
+                                        ? 'border-green-300 bg-green-50'
+                                        : 'border-gray-300 hover:border-gray-400 bg-gray-50'
+                                        }`}>
                                         {previewUrl ? (
-                                            <div className="space-y-2">
-                                                <img
-                                                    src={previewUrl}
-                                                    alt="Receipt preview"
-                                                    className="max-h-48 mx-auto rounded"
-                                                />
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        setSelectedFile(null);
-                                                        setPreviewUrl('');
-                                                    }}
-                                                >
-                                                    Remove File
-                                                </Button>
+                                            <div className="space-y-4">
+                                                <div className="relative inline-block">
+                                                    <img
+                                                        src={previewUrl}
+                                                        alt="Receipt preview"
+                                                        className="max-h-48 mx-auto rounded-lg shadow-sm border"
+                                                    />
+                                                    <div className="absolute -top-2 -right-2">
+                                                        <div className="bg-green-100 text-green-600 rounded-full p-1">
+                                                            <CheckCircle className="w-4 h-4" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <p className="text-sm font-medium text-green-800">
+                                                        File uploaded successfully
+                                                    </p>
+                                                    <p className="text-xs text-green-600">
+                                                        {selectedFile?.name} ({((selectedFile?.size || 0) / 1024 / 1024).toFixed(2)} MB)
+                                                    </p>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            setSelectedFile(null);
+                                                            setPreviewUrl('');
+                                                        }}
+                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                    >
+                                                        <XCircle className="w-4 h-4 mr-2" />
+                                                        Remove File
+                                                    </Button>
+                                                </div>
                                             </div>
                                         ) : (
-                                            <div>
-                                                <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
-                                                <div className="mt-2">
+                                            <div className="space-y-4">
+                                                <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                                                    <Upload className="w-8 h-8 text-blue-600" />
+                                                </div>
+                                                <div>
                                                     <label htmlFor="receipt-file" className="cursor-pointer">
-                                                        <span className="text-primary hover:underline">
-                                                            Upload a file
+                                                        <span className="text-lg font-medium text-blue-600 hover:text-blue-700 hover:underline">
+                                                            Upload a receipt file
                                                         </span>
                                                         <input
                                                             id="receipt-file"
@@ -383,184 +586,468 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
                                                             required
                                                         />
                                                     </label>
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        PNG, JPG, PDF up to 10MB
+                                                    <p className="text-sm text-muted-foreground mt-2">
+                                                        or drag and drop your file here
                                                     </p>
+                                                </div>
+                                                <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                                                    <div className="flex items-center gap-1">
+                                                        <FileText className="w-3 h-3" />
+                                                        <span>PNG, JPG, PDF</span>
+                                                    </div>
+                                                    <div className="w-px h-4 bg-gray-300"></div>
+                                                    <div className="flex items-center gap-1">
+                                                        <Upload className="w-3 h-3" />
+                                                        <span>Max 10MB</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
+                                    {!selectedFile && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Upload a clear image or PDF of your receipt for processing
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* Basic Information */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="title">Title *</Label>
+                                        <Label htmlFor="title" className="text-sm font-medium">
+                                            Receipt Title *
+                                        </Label>
                                         <Input
                                             id="title"
                                             value={formData.title}
                                             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                             placeholder="e.g., Office supplies purchase"
                                             required
+                                            className="w-full"
                                         />
+                                        {!formData.title && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Enter a descriptive title for this receipt
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="type">Receipt Type *</Label>
+                                        <Label htmlFor="type" className="text-sm font-medium">
+                                            Receipt Type *
+                                        </Label>
                                         <Select
                                             value={formData.type}
                                             onValueChange={(value: ReceiptType) => setFormData({ ...formData, type: value })}
+                                            required
                                         >
-                                            <SelectTrigger>
-                                                <SelectValue />
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="Select receipt type..." />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="official">
-                                                    <div className="flex items-center gap-2">
-                                                        <Shield className="w-4 h-4 text-blue-600" />
-                                                        Official Receipt
+                                                <SelectItem value="official" className="cursor-pointer">
+                                                    <div className="flex items-center gap-3 py-2">
+                                                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100">
+                                                            <Shield className="w-4 h-4 text-blue-600" />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <div className="font-medium text-sm">Official Receipt</div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                Formal business receipts with tax implications
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </SelectItem>
-                                                <SelectItem value="unofficial">
-                                                    <div className="flex items-center gap-2">
-                                                        <FileText className="w-4 h-4 text-gray-600" />
-                                                        Unofficial Receipt
+                                                <SelectItem value="unofficial" className="cursor-pointer">
+                                                    <div className="flex items-center gap-3 py-2">
+                                                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100">
+                                                            <FileText className="w-4 h-4 text-gray-600" />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <div className="font-medium text-sm">Unofficial Receipt</div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                Informal receipts for internal tracking
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </SelectItem>
                                             </SelectContent>
                                         </Select>
+                                        {formData.type && (
+                                            <div className="flex items-center gap-2 text-xs text-green-600">
+                                                <CheckCircle className="w-3 h-3" />
+                                                <span>
+                                                    {formData.type === 'official' ? 'Official receipt selected' : 'Unofficial receipt selected'}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="description">Description</Label>
+                                    <Label htmlFor="description" className="text-sm font-medium">
+                                        Description
+                                    </Label>
                                     <Textarea
                                         id="description"
                                         value={formData.description}
                                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                        placeholder="Additional details about this receipt"
-                                        rows={2}
+                                        placeholder="Additional details about this receipt (optional)"
+                                        rows={3}
+                                        className="resize-none"
                                     />
+                                    <p className="text-xs text-muted-foreground">
+                                        Provide any additional context or details about this expense
+                                    </p>
                                 </div>
 
-                                {/* Amount and Date */}
+                                {/* Amount, Date, and Category */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="amount">Amount (₱) *</Label>
-                                        <Input
-                                            id="amount"
-                                            type="number"
-                                            step="0.01"
-                                            value={formData.amount}
-                                            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                            placeholder="0.00"
-                                            required
-                                        />
+                                        <Label htmlFor="amount" className="text-sm font-medium">
+                                            Amount (₱) *
+                                        </Label>
+                                        <div className="relative">
+                                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                            <Input
+                                                id="amount"
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                value={formData.amount}
+                                                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                                                placeholder="0.00"
+                                                className="pl-10"
+                                                required
+                                            />
+                                        </div>
+                                        {formData.amount && parseFloat(formData.amount) > 0 && (
+                                            <div className="flex items-center gap-2 text-xs text-green-600">
+                                                <CheckCircle className="w-3 h-3" />
+                                                <span>₱{parseFloat(formData.amount).toLocaleString()}</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="date">Date *</Label>
-                                        <Input
-                                            id="date"
-                                            type="date"
-                                            value={formData.date}
-                                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                                            required
-                                        />
+                                        <Label htmlFor="date" className="text-sm font-medium">
+                                            Receipt Date *
+                                        </Label>
+                                        <div className="relative">
+                                            <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                            <Input
+                                                id="date"
+                                                type="date"
+                                                value={formData.date}
+                                                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                                                className="pl-10"
+                                                required
+                                            />
+                                        </div>
+                                        {formData.date && (
+                                            <div className="flex items-center gap-2 text-xs text-green-600">
+                                                <CheckCircle className="w-3 h-3" />
+                                                <span>{new Date(formData.date).toLocaleDateString()}</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="category">Category *</Label>
+                                        <Label htmlFor="category" className="text-sm font-medium">
+                                            Category *
+                                        </Label>
                                         <Select
                                             value={formData.categoryId}
                                             onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+                                            required
                                         >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select category" />
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="Choose a category..." />
                                             </SelectTrigger>
-                                            <SelectContent>
-                                                {categories.map((category) => (
-                                                    <SelectItem key={category.id} value={category.id}>
-                                                        {category.name}
-                                                    </SelectItem>
-                                                ))}
+                                            <SelectContent className="max-h-[300px]">
+                                                {categories.length === 0 ? (
+                                                    <div className="p-6 text-center">
+                                                        <div className="flex flex-col items-center gap-3">
+                                                            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
+                                                                <AlertTriangle className="w-6 h-6 text-amber-600" />
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <p className="text-sm font-medium text-gray-900">No categories available</p>
+                                                                <p className="text-xs text-muted-foreground max-w-xs">
+                                                                    Receipt categories need to be initialized.
+                                                                    {(userRole === 'admin' || userRole === 'super_admin')
+                                                                        ? ' Click below to set up default categories.'
+                                                                        : ' Please contact your administrator.'
+                                                                    }
+                                                                </p>
+                                                            </div>
+                                                            {(userRole === 'admin' || userRole === 'super_admin') && (
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    disabled={initializingCategories}
+                                                                    onClick={async () => {
+                                                                        try {
+                                                                            setInitializingCategories(true);
+                                                                            await receiptService.initializeCategories(currentUserId);
+                                                                            await loadData(); // Reload data to get new categories
+                                                                            alert('Categories initialized successfully!');
+                                                                        } catch (error) {
+                                                                            console.error('Failed to initialize categories:', error);
+                                                                            alert('Failed to initialize categories. Please try again.');
+                                                                        } finally {
+                                                                            setInitializingCategories(false);
+                                                                        }
+                                                                    }}
+                                                                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                                                                >
+                                                                    {initializingCategories ? (
+                                                                        <>
+                                                                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                                                                            Initializing...
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Plus className="w-3 h-3 mr-1" />
+                                                                            Initialize Categories
+                                                                        </>
+                                                                    )}
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {/* Popular/Common Categories First */}
+                                                        {categories
+                                                            .filter(cat => ['Office Supplies', 'Transportation', 'Meals & Entertainment', 'Equipment'].includes(cat.name))
+                                                            .map((category) => (
+                                                                <SelectItem
+                                                                    key={category.id}
+                                                                    value={category.id}
+                                                                    className="cursor-pointer"
+                                                                >
+                                                                    <div className="flex items-start gap-3 py-1">
+                                                                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 text-xs font-medium mt-0.5">
+                                                                            {getCategoryIcon(category.name)}
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="font-medium text-sm">{category.name}</div>
+                                                                            <div className="text-xs text-muted-foreground line-clamp-2">
+                                                                                {category.description}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </SelectItem>
+                                                            ))
+                                                        }
+
+                                                        {/* Separator for other categories */}
+                                                        {categories.filter(cat => !['Office Supplies', 'Transportation', 'Meals & Entertainment', 'Equipment'].includes(cat.name)).length > 0 && (
+                                                            <div className="px-2 py-1">
+                                                                <div className="border-t border-muted"></div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Other Categories */}
+                                                        {categories
+                                                            .filter(cat => !['Office Supplies', 'Transportation', 'Meals & Entertainment', 'Equipment'].includes(cat.name))
+                                                            .sort((a, b) => a.name.localeCompare(b.name))
+                                                            .map((category) => (
+                                                                <SelectItem
+                                                                    key={category.id}
+                                                                    value={category.id}
+                                                                    className="cursor-pointer"
+                                                                >
+                                                                    <div className="flex items-start gap-3 py-1">
+                                                                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 text-xs font-medium mt-0.5">
+                                                                            {getCategoryIcon(category.name)}
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="font-medium text-sm">{category.name}</div>
+                                                                            <div className="text-xs text-muted-foreground line-clamp-2">
+                                                                                {category.description}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </SelectItem>
+                                                            ))
+                                                        }
+                                                    </>
+                                                )}
                                             </SelectContent>
                                         </Select>
+                                        {!formData.categoryId && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Select the category that best describes this expense
+                                            </p>
+                                        )}
+                                        {formData.categoryId && (
+                                            <div className="flex items-center gap-2 text-xs text-green-600">
+                                                <CheckCircle className="w-3 h-3" />
+                                                <span>Category selected</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
                                 {/* Additional Information */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="vendor">Vendor/Supplier</Label>
-                                        <Input
-                                            id="vendor"
-                                            value={formData.vendor}
-                                            onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-                                            placeholder="Company or person"
-                                        />
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                                        <div className="h-px bg-border flex-1"></div>
+                                        <span>Additional Information</span>
+                                        <div className="h-px bg-border flex-1"></div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="vendor" className="text-sm font-medium">
+                                                Vendor/Supplier
+                                            </Label>
+                                            <div className="relative">
+                                                <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                                <Input
+                                                    id="vendor"
+                                                    value={formData.vendor}
+                                                    onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
+                                                    placeholder="Company or person name"
+                                                    className="pl-10"
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Who did you purchase from?
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="invoiceNumber" className="text-sm font-medium">
+                                                Invoice/Receipt Number
+                                            </Label>
+                                            <div className="relative">
+                                                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                                <Input
+                                                    id="invoiceNumber"
+                                                    value={formData.invoiceNumber}
+                                                    onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
+                                                    placeholder="Receipt or invoice number"
+                                                    className="pl-10"
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Reference number from the receipt
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="taxAmount" className="text-sm font-medium">
+                                                Tax Amount (₱)
+                                            </Label>
+                                            <div className="relative">
+                                                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                                <Input
+                                                    id="taxAmount"
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={formData.taxAmount}
+                                                    onChange={(e) => setFormData({ ...formData, taxAmount: e.target.value })}
+                                                    placeholder="0.00"
+                                                    className="pl-10"
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                VAT or other tax amount (if applicable)
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="tags" className="text-sm font-medium">
+                                                Tags
+                                            </Label>
+                                            <div className="relative">
+                                                <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                                <Input
+                                                    id="tags"
+                                                    value={formData.tags}
+                                                    onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                                                    placeholder="e.g., urgent, reimbursable, project-alpha"
+                                                    className="pl-10"
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Separate multiple tags with commas
+                                            </p>
+                                        </div>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="invoiceNumber">Invoice/Receipt Number</Label>
-                                        <Input
-                                            id="invoiceNumber"
-                                            value={formData.invoiceNumber}
-                                            onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
-                                            placeholder="Receipt or invoice number"
+                                        <Label htmlFor="notes" className="text-sm font-medium">
+                                            Notes
+                                        </Label>
+                                        <Textarea
+                                            id="notes"
+                                            value={formData.notes}
+                                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                            placeholder="Additional notes or comments about this expense..."
+                                            rows={3}
+                                            className="resize-none"
                                         />
+                                        <p className="text-xs text-muted-foreground">
+                                            Any additional context, approval requirements, or special notes
+                                        </p>
                                     </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="taxAmount">Tax Amount (₱)</Label>
-                                        <Input
-                                            id="taxAmount"
-                                            type="number"
-                                            step="0.01"
-                                            value={formData.taxAmount}
-                                            onChange={(e) => setFormData({ ...formData, taxAmount: e.target.value })}
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="tags">Tags (comma separated)</Label>
-                                        <Input
-                                            id="tags"
-                                            value={formData.tags}
-                                            onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                                            placeholder="e.g., urgent, reimbursable"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="notes">Notes</Label>
-                                    <Textarea
-                                        id="notes"
-                                        value={formData.notes}
-                                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                        placeholder="Additional notes or comments"
-                                        rows={2}
-                                    />
                                 </div>
 
                                 {/* Submit Buttons */}
-                                <div className="flex gap-2 justify-end">
+                                <div className="flex flex-col sm:flex-row gap-3 justify-end pt-4 border-t">
                                     <Button
                                         type="button"
                                         variant="outline"
                                         onClick={() => setIsUploadDialogOpen(false)}
                                         disabled={uploading}
+                                        className="sm:w-auto w-full"
                                     >
+                                        <XCircle className="w-4 h-4 mr-2" />
                                         Cancel
                                     </Button>
-                                    <Button type="submit" disabled={uploading}>
-                                        {uploading ? 'Uploading...' : 'Upload Receipt'}
+                                    <Button
+                                        type="submit"
+                                        disabled={uploading || !selectedFile || !formData.title || !formData.amount || !formData.categoryId}
+                                        className="sm:w-auto w-full bg-blue-600 hover:bg-blue-700"
+                                    >
+                                        {uploading ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                                Uploading Receipt...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload className="w-4 h-4 mr-2" />
+                                                Upload Receipt
+                                            </>
+                                        )}
                                     </Button>
                                 </div>
+
+                                {/* Form Validation Summary */}
+                                {(!selectedFile || !formData.title || !formData.amount || !formData.categoryId) && (
+                                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <div className="flex items-start gap-2">
+                                            <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                                            <div className="text-sm">
+                                                <p className="font-medium text-amber-800 mb-1">Please complete the required fields:</p>
+                                                <ul className="text-amber-700 space-y-1">
+                                                    {!selectedFile && <li>• Upload a receipt file</li>}
+                                                    {!formData.title && <li>• Enter a receipt title</li>}
+                                                    {!formData.amount && <li>• Enter the amount</li>}
+                                                    {!formData.categoryId && <li>• Select a category</li>}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </form>
                         </DialogContent>
                     </Dialog>
@@ -1000,6 +1487,24 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
                     </DialogContent>
                 </Dialog>
             )}
+
+            {/* AI Camera Scan Modal */}
+            <AICameraScanModal
+                isOpen={isAICameraOpen}
+                onClose={() => setIsAICameraOpen(false)}
+                onScanComplete={handleAIScanComplete}
+            />
+
+            {/* AI Financial Dashboard */}
+            <AIFinancialDashboard
+                receipts={receipts}
+                isOpen={isAIDashboardOpen}
+                onClose={() => setIsAIDashboardOpen(false)}
+                currentUserId={currentUserId}
+                userRole={userRole}
+                initialViewScope={aiDashboardViewScope}
+                onViewScopeChange={handleAIDashboardViewScopeChange}
+            />
         </div>
     );
 };
