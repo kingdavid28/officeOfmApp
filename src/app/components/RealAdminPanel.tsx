@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { EditUserRoleModal } from './EditUserRoleModal';
 import { EditProfileModal } from './EditProfileModal';
+import { AdminPanelSkeleton } from './skeletons/AdminPanelSkeleton';
 import { Edit3, Settings } from 'lucide-react';
 import { debugAuthState } from '../../utils/debug-auth';
 
@@ -302,14 +303,9 @@ export const RealAdminPanel: React.FC<RealAdminPanelProps> = ({ currentUserUid, 
     setShowEditProfileModal(false);
   };
 
-  if (loading || !currentUserProfile) return (
-    <div className="flex items-center justify-center p-8">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-        <p className="text-gray-600">Loading admin panel...</p>
-      </div>
-    </div>
-  );
+  if (loading || !currentUserProfile) {
+    return <AdminPanelSkeleton />;
+  }
 
   // Function to render tab content
   const renderTabContent = () => {

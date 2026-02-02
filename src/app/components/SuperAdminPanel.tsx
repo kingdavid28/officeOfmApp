@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { authService } from '../../lib/auth';
 import { PendingUser } from '../../lib/types';
 import { EditProfileModal } from './EditProfileModal';
+import { SuperAdminPanelSkeleton } from './skeletons/SuperAdminPanelSkeleton';
 import { Button } from './ui/button';
 import { Settings } from 'lucide-react';
 
@@ -83,14 +84,9 @@ export const SuperAdminPanel: React.FC<SuperAdminPanelProps> = ({ currentUserUid
     setShowEditProfileModal(false);
   };
 
-  if (loading || !currentUserProfile) return (
-    <div className="flex items-center justify-center p-8">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-        <p className="text-gray-600">Loading super admin panel...</p>
-      </div>
-    </div>
-  );
+  if (loading || !currentUserProfile) {
+    return <SuperAdminPanelSkeleton />;
+  }
 
   return (
     <div className="p-6">

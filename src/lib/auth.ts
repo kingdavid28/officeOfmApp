@@ -248,7 +248,7 @@ export const authService = {
       lastLogin: new Date(),
       approvedBy: approverUid,
       approvedAt: new Date(),
-      assignedAdminId: pendingUser.role === 'staff' ? (pendingUser.requestedAdminId || approverUid) : undefined
+      ...(pendingUser.role === 'staff' && { assignedAdminId: pendingUser.requestedAdminId || approverUid })
     };
 
     // Store in a separate collection for pre-approved Google users
@@ -312,7 +312,7 @@ export const authService = {
         lastLogin: new Date(),
         approvedBy: approverUid,
         approvedAt: new Date(),
-        assignedAdminId: pendingUser.role === 'staff' ? (pendingUser.requestedAdminId || approverUid) : undefined
+        ...(pendingUser.role === 'staff' && { assignedAdminId: pendingUser.requestedAdminId || approverUid })
       };
 
       await setDoc(doc(db, 'users', result.user.uid), profile);
@@ -463,7 +463,7 @@ export const authService = {
         lastLogin: new Date(),
         approvedBy: createdBy,
         approvedAt: new Date(),
-        assignedAdminId: role === 'staff' ? createdBy : undefined
+        ...(role === 'staff' && { assignedAdminId: createdBy })
       };
 
       await setDoc(doc(db, 'users', result.user.uid), profile);

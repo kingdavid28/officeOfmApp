@@ -31,6 +31,7 @@ import {
 import { AIFinancialAnalyzer, ExpenseAnalytics, SpendingPattern, BudgetAlert, FinancialInsight } from '../../lib/ai-financial-insights';
 import { receiptService } from '../../lib/receipt-service';
 import { ReceiptViewScopeSelector } from './ReceiptViewScopeSelector';
+import { AIFinancialDashboardSkeleton } from './skeletons/AIFinancialDashboardSkeleton';
 import { ReceiptViewScope } from '../../lib/user-preferences';
 import { Receipt } from '../../lib/receipt-types';
 
@@ -160,13 +161,7 @@ export const AIFinancialDashboard: React.FC<AIFinancialDashboardProps> = ({
                 </DialogHeader>
 
                 {loading ? (
-                    <div className="flex items-center justify-center p-8">
-                        <div className="text-center">
-                            <Brain className="w-12 h-12 mx-auto mb-4 text-blue-600 animate-pulse" />
-                            <p className="text-lg font-medium">AI is analyzing your expenses...</p>
-                            <p className="text-sm text-muted-foreground">This may take a few moments</p>
-                        </div>
-                    </div>
+                    <AIFinancialDashboardSkeleton />
                 ) : analytics ? (
                     <div className="space-y-4">
                         {/* View Scope Indicator */}

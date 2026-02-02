@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Textarea } from './ui/textarea';
+import { Skeleton } from './ui/skeleton';
 import {
     Plus,
     Upload,
@@ -57,6 +58,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { receiptService } from '../../lib/receipt-service';
 import { authService, UserProfile } from '../../lib/auth';
+import { FriaryFinancialReportGeneratorComponent } from './FriaryFinancialReportGenerator';
+import { DetailedFinancialReportComponent } from './DetailedFinancialReport';
 import { userPreferencesService, ReceiptViewScope } from '../../lib/user-preferences';
 import { AICameraScanModal } from './AICameraScanModal';
 import { AIFinancialDashboard } from './AIFinancialDashboard';
@@ -102,7 +105,7 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
 
     // Filter states
     const [filter, setFilter] = useState<ReceiptFilter>({});
-    const [activeTab, setActiveTab] = useState<'all' | 'official' | 'unofficial'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'official' | 'unofficial' | 'financial'>('all');
 
     // Form states
     const [formData, setFormData] = useState({
@@ -446,11 +449,108 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center p-8">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                    <p className="text-gray-600">Loading receipts...</p>
+            <div className="space-y-6">
+                {/* Header Skeleton */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <Skeleton className="h-9 w-48 mb-2" />
+                        <Skeleton className="h-5 w-64" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Skeleton className="h-9 w-32" />
+                        <Skeleton className="h-9 w-28" />
+                        <Skeleton className="h-9 w-24" />
+                        <Skeleton className="h-9 w-36" />
+                    </div>
                 </div>
+
+                {/* Summary Stats Skeleton */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <Card key={i}>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-4 w-20" />
+                                        <Skeleton className="h-8 w-16" />
+                                    </div>
+                                    <Skeleton className="h-8 w-8 rounded-lg" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+
+                {/* Tabs and Content Skeleton */}
+                <Card>
+                    <CardContent className="pt-6">
+                        {/* Tab Headers */}
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex space-x-1">
+                                <Skeleton className="h-10 w-24" />
+                                <Skeleton className="h-10 w-20" />
+                                <Skeleton className="h-10 w-24" />
+                            </div>
+                            <Skeleton className="h-9 w-20" />
+                        </div>
+
+                        {/* Receipt Cards Grid Skeleton */}
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            {Array.from({ length: 6 }).map((_, i) => (
+                                <Card key={i} className="overflow-hidden">
+                                    {/* Image Skeleton */}
+                                    <div className="aspect-video relative">
+                                        <Skeleton className="w-full h-full" />
+                                        <div className="absolute top-2 left-2 flex gap-1">
+                                            <Skeleton className="w-6 h-6 rounded-full" />
+                                            <Skeleton className="w-6 h-6 rounded-full" />
+                                        </div>
+                                    </div>
+
+                                    {/* Card Header */}
+                                    <CardHeader>
+                                        <div className="flex items-center justify-between">
+                                            <Skeleton className="h-5 w-32" />
+                                            <Skeleton className="h-6 w-16 rounded-full" />
+                                        </div>
+                                    </CardHeader>
+
+                                    {/* Card Content */}
+                                    <CardContent>
+                                        <div className="space-y-3">
+                                            {/* Amount and Actions */}
+                                            <div className="flex items-center justify-between">
+                                                <Skeleton className="h-7 w-20" />
+                                                <div className="flex gap-1">
+                                                    <Skeleton className="w-8 h-8 rounded" />
+                                                    <Skeleton className="w-8 h-8 rounded" />
+                                                </div>
+                                            </div>
+
+                                            {/* Category and Status */}
+                                            <div className="flex items-center justify-between">
+                                                <Skeleton className="h-5 w-24 rounded-full" />
+                                                <Skeleton className="h-5 w-20 rounded-full" />
+                                            </div>
+
+                                            {/* Date */}
+                                            <Skeleton className="h-4 w-28" />
+
+                                            {/* Uploaded by */}
+                                            <Skeleton className="h-4 w-32" />
+
+                                            {/* Tags */}
+                                            <div className="flex flex-wrap gap-1">
+                                                <Skeleton className="h-5 w-16 rounded-full" />
+                                                <Skeleton className="h-5 w-20 rounded-full" />
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         );
     }
@@ -1122,6 +1222,10 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
                                     <FileText className="w-4 h-4 mr-2" />
                                     Unofficial
                                 </TabsTrigger>
+                                <TabsTrigger value="financial">
+                                    <BarChart3 className="w-4 h-4 mr-2" />
+                                    Financial Report
+                                </TabsTrigger>
                             </TabsList>
 
                             <Button variant="outline" size="sm">
@@ -1130,7 +1234,7 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
                             </Button>
                         </div>
 
-                        <TabsContent value={activeTab} className="mt-0">
+                        <TabsContent value="all" className="mt-0">
                             {filteredReceipts.length === 0 ? (
                                 <div className="text-center py-8">
                                     <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
@@ -1268,6 +1372,221 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
                                     ))}
                                 </div>
                             )}
+                        </TabsContent>
+
+                        <TabsContent value="official" className="mt-0">
+                            {filteredReceipts.filter(r => r.type === 'official').length === 0 ? (
+                                <div className="text-center py-8">
+                                    <Shield className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                                    <p className="text-muted-foreground">
+                                        No official receipts found.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                    {filteredReceipts.filter(r => r.type === 'official').map((receipt) => (
+                                        <Card
+                                            key={receipt.id}
+                                            className="hover:shadow-md transition-shadow cursor-pointer"
+                                            onClick={() => {
+                                                setSelectedReceipt(receipt);
+                                                setIsViewDialogOpen(true);
+                                            }}
+                                        >
+                                            {/* Same receipt card content as above */}
+                                            <div className="aspect-video relative overflow-hidden rounded-t-lg bg-muted">
+                                                <img
+                                                    src={receipt.imageUrl}
+                                                    alt={receipt.title}
+                                                    className="object-cover w-full h-full"
+                                                />
+                                                <div className="absolute top-2 left-2 flex gap-1">
+                                                    {getTypeIcon(receipt.type)}
+                                                    {getStatusIcon(receipt.status)}
+                                                </div>
+                                            </div>
+                                            <CardHeader>
+                                                <CardTitle className="text-base line-clamp-2 flex items-center justify-between">
+                                                    <span>{receipt.title}</span>
+                                                    <Badge variant="default">Official</Badge>
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-2xl font-bold">
+                                                            ₱{receipt.amount.toLocaleString()}
+                                                        </span>
+                                                        <div className="flex gap-1">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDownload(receipt.id);
+                                                                }}
+                                                            >
+                                                                <Download className="h-4 w-4" />
+                                                            </Button>
+                                                            {canDelete(receipt) && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDelete(receipt.id);
+                                                                    }}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center justify-between">
+                                                        <Badge variant="outline">{receipt.category}</Badge>
+                                                        <Badge variant={
+                                                            receipt.status === 'approved' ? 'default' :
+                                                                receipt.status === 'rejected' ? 'destructive' : 'secondary'
+                                                        }>
+                                                            {receipt.status}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                        <CalendarIcon className="h-3 w-3" />
+                                                        {new Date(receipt.date).toLocaleDateString()}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        By: {receipt.uploadedByName}
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            )}
+                        </TabsContent>
+
+                        <TabsContent value="unofficial" className="mt-0">
+                            {filteredReceipts.filter(r => r.type === 'unofficial').length === 0 ? (
+                                <div className="text-center py-8">
+                                    <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                                    <p className="text-muted-foreground">
+                                        No unofficial receipts found.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                    {filteredReceipts.filter(r => r.type === 'unofficial').map((receipt) => (
+                                        <Card
+                                            key={receipt.id}
+                                            className="hover:shadow-md transition-shadow cursor-pointer"
+                                            onClick={() => {
+                                                setSelectedReceipt(receipt);
+                                                setIsViewDialogOpen(true);
+                                            }}
+                                        >
+                                            {/* Same receipt card content as above */}
+                                            <div className="aspect-video relative overflow-hidden rounded-t-lg bg-muted">
+                                                <img
+                                                    src={receipt.imageUrl}
+                                                    alt={receipt.title}
+                                                    className="object-cover w-full h-full"
+                                                />
+                                                <div className="absolute top-2 left-2 flex gap-1">
+                                                    {getTypeIcon(receipt.type)}
+                                                    {getStatusIcon(receipt.status)}
+                                                </div>
+                                            </div>
+                                            <CardHeader>
+                                                <CardTitle className="text-base line-clamp-2 flex items-center justify-between">
+                                                    <span>{receipt.title}</span>
+                                                    <Badge variant="secondary">Unofficial</Badge>
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-2xl font-bold">
+                                                            ₱{receipt.amount.toLocaleString()}
+                                                        </span>
+                                                        <div className="flex gap-1">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDownload(receipt.id);
+                                                                }}
+                                                            >
+                                                                <Download className="h-4 w-4" />
+                                                            </Button>
+                                                            {canDelete(receipt) && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDelete(receipt.id);
+                                                                    }}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center justify-between">
+                                                        <Badge variant="outline">{receipt.category}</Badge>
+                                                        <Badge variant={
+                                                            receipt.status === 'approved' ? 'default' :
+                                                                receipt.status === 'rejected' ? 'destructive' : 'secondary'
+                                                        }>
+                                                            {receipt.status}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                        <CalendarIcon className="h-3 w-3" />
+                                                        {new Date(receipt.date).toLocaleDateString()}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        By: {receipt.uploadedByName}
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            )}
+                        </TabsContent>
+
+                        <TabsContent value="financial" className="mt-0">
+                            <Tabs defaultValue="summary" className="w-full">
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="summary" className="flex items-center gap-2">
+                                        <BarChart3 className="w-4 h-4" />
+                                        Summary Report
+                                    </TabsTrigger>
+                                    <TabsTrigger value="detailed" className="flex items-center gap-2">
+                                        <FileText className="w-4 h-4" />
+                                        Detailed Transactions
+                                    </TabsTrigger>
+                                </TabsList>
+
+                                <TabsContent value="summary" className="mt-4">
+                                    <FriaryFinancialReportGeneratorComponent
+                                        currentUserUid={currentUserId}
+                                        currentUserName={currentUserProfile?.name || 'Unknown User'}
+                                        userRole={userRole}
+                                    />
+                                </TabsContent>
+
+                                <TabsContent value="detailed" className="mt-4">
+                                    <DetailedFinancialReportComponent
+                                        currentUserUid={currentUserId}
+                                        currentUserName={currentUserProfile?.name || 'Unknown User'}
+                                        userRole={userRole}
+                                    />
+                                </TabsContent>
+                            </Tabs>
                         </TabsContent>
                     </Tabs>
                 </CardContent>
