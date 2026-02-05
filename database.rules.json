@@ -1,0 +1,153 @@
+{
+    "rules": {
+        ".read": false,
+        ".write": false,
+        "organizations": {
+            "$organizationId": {
+                "messages": {
+                    ".read": "auth != null",
+                    ".indexOn": [
+                        "timestamp",
+                        "senderId"
+                    ],
+                    "$messageId": {
+                        ".write": "auth != null",
+                        ".validate": "newData.hasChildren(['id', 'content', 'senderId', 'senderName', 'organizationId', 'timestamp', 'type'])"
+                    }
+                },
+                "typing": {
+                    ".read": "auth != null",
+                    "$userId": {
+                        ".write": "auth != null && auth.uid == $userId"
+                    }
+                },
+                "notifications": {
+                    ".read": "auth != null",
+                    ".indexOn": [
+                        "createdAt",
+                        "read"
+                    ],
+                    "$notificationId": {
+                        ".write": "auth != null"
+                    }
+                }
+            }
+        },
+        "users": {
+            "$userId": {
+                "notifications": {
+                    ".read": "auth != null && auth.uid == $userId",
+                    ".indexOn": [
+                        "createdAt",
+                        "read"
+                    ],
+                    "$notificationId": {
+                        ".write": "auth != null",
+                        ".validate": "newData.hasChildren(['id', 'userId', 'title', 'message', 'type', 'read', 'createdAt'])"
+                    }
+                }
+            }
+        },
+        "ai_chat": {
+            "messages": {
+                ".read": "auth != null",
+                ".indexOn": [
+                    "timestamp",
+                    "userId"
+                ],
+                "$messageId": {
+                    ".write": "auth != null",
+                    ".validate": "newData.hasChildren(['id', 'userId', 'userName', 'userRole', 'message', 'timestamp', 'type', 'status'])"
+                }
+            }
+        },
+        "chats": {
+            ".read": "auth != null",
+            ".indexOn": [
+                "updatedAt",
+                "createdAt"
+            ],
+            "$chatId": {
+                ".read": "auth != null && root.child('chats').child($chatId).child('participants').child(auth.uid).exists()",
+                ".write": "auth != null",
+                ".validate": "newData.hasChildren(['id', 'name', 'type', 'createdBy', 'createdAt', 'updatedAt', 'participants', 'settings'])"
+            }
+        },
+        "messages": {
+            "$chatId": {
+                ".read": "auth != null && root.child('chats').child($chatId).child('participants').child(auth.uid).exists()",
+                ".indexOn": [
+                    "timestamp",
+                    "senderId"
+                ],
+                "$messageId": {
+                    ".write": "auth != null && root.child('chats').child($chatId).child('participants').child(auth.uid).exists()",
+                    ".validate": "newData.hasChildren(['id', 'chatId', 'senderId', 'senderName', 'senderRole', 'content', 'timestamp', 'type', 'status'])"
+                }
+            }
+        },
+        "message_notifications": {
+            "$userId": {
+                ".read": "auth != null && auth.uid == $userId",
+                ".indexOn": [
+                    "timestamp",
+                    "read",
+                    "priority"
+                ],
+                "$notificationId": {
+                    ".write": "auth != null",
+                    ".validate": "newData.hasChildren(['id', 'userId', 'chatId', 'messageId', 'type', 'title', 'body', 'timestamp', 'read', 'priority'])"
+                }
+            }
+        },
+        "chat_typing": {
+            "$chatId": {
+                ".read": "auth != null && root.child('chats').child($chatId).child('participants').child(auth.uid).exists()",
+                "$userId": {
+                    ".write": "auth != null && auth.uid == $userId"
+                }
+            }
+        },
+        "presence": {
+            ".read": "auth != null",
+            "$userId": {
+                ".write": "auth != null && auth.uid == $userId",
+                ".validate": "newData.hasChildren(['userId', 'userName', 'userRole', 'status', 'lastSeen'])"
+            }
+        },
+        "typing": {
+            ".read": "auth != null",
+            "$userId": {
+                ".write": "auth != null && auth.uid == $userId",
+                ".validate": "newData.hasChildren(['userId', 'userName', 'isTyping', 'timestamp'])"
+            }
+        },
+        "notifications": {
+            "$userId": {
+                ".read": "auth != null && auth.uid == $userId",
+                ".indexOn": [
+                    "timestamp",
+                    "read"
+                ],
+                "$notificationId": {
+                    ".write": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('role').val() == 'super_admin')",
+                    ".validate": "newData.hasChildren(['id', 'userId', 'type', 'title', 'message', 'timestamp', 'read', 'priority'])"
+                }
+            }
+        },
+        "collaborative": {
+            "sessions": {
+                ".read": "auth != null",
+                "$sessionId": {
+                    ".write": "auth != null",
+                    ".validate": "newData.hasChildren(['sessionId', 'documentId', 'participants', 'createdAt', 'updatedAt'])",
+                    "participants": {
+                        "$userId": {
+                            ".write": "auth != null && auth.uid == $userId"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

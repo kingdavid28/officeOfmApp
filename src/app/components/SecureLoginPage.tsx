@@ -51,7 +51,7 @@ export function SecureLoginPage() {
       const credential = await navigator.credentials.create({
         publicKey: {
           challenge: new Uint8Array(32),
-          rp: { name: "Office OFM" },
+          rp: { name: "OFM-South AI" },
           user: {
             id: new TextEncoder().encode("user"),
             name: email || "user@office.com",
@@ -94,7 +94,7 @@ export function SecureLoginPage() {
     try {
       // Simulate network delay for security
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       const success = login(email, password);
       if (!success) {
         setLoginAttempts(prev => prev + 1);
@@ -112,9 +112,9 @@ export function SecureLoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center mb-4">
-            <img 
-              src={logoImage} 
-              alt="Province Logo" 
+            <img
+              src={logoImage}
+              alt="Province Logo"
               className="h-24 w-24 object-contain"
             />
           </div>
@@ -169,21 +169,21 @@ export function SecureLoginPage() {
                 </Button>
               </div>
             </div>
-            
+
             {error && (
               <div className="p-3 rounded-md bg-red-50 border border-red-200">
                 <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
-            
+
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Signing In...' : 'Sign In'}
             </Button>
-            
+
             {biometric.available && (
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 className="w-full"
                 onClick={handleBiometricLogin}
                 disabled={isLoading}
@@ -192,7 +192,7 @@ export function SecureLoginPage() {
                 Use Biometric Login
               </Button>
             )}
-            
+
             <div className="text-xs text-muted-foreground text-center space-y-1">
               <p>Demo credentials: admin@province.ph / password</p>
               <p>Login attempts: {loginAttempts}/3</p>

@@ -1,1 +1,140 @@
-import React, { useState } from 'react';\nimport { authService, UserRole } from '../../lib/auth';\nimport { GoogleSignInButton } from './GoogleSignInButton';\n\nexport const UserRegistrationRequestWithGoogle: React.FC = () => {\n  const [formData, setFormData] = useState({\n    email: '',\n    name: '',\n    role: 'staff' as UserRole\n  });\n  const [loading, setLoading] = useState(false);\n  const [submitted, setSubmitted] = useState(false);\n  const [error, setError] = useState('');\n\n  const handleSubmit = async (e: React.FormEvent) => {\n    e.preventDefault();\n    setLoading(true);\n    setError('');\n\n    try {\n      await authService.requestUserCreation(formData.email, formData.name, formData.role);\n      setSubmitted(true);\n    } catch (error) {\n      console.error('Error submitting request:', error);\n      setError('Error submitting request. Please try again.');\n    } finally {\n      setLoading(false);\n    }\n  };\n\n  const handleGoogleSuccess = () => {\n    setSubmitted(true);\n  };\n\n  const handleGoogleError = (errorMessage: string) => {\n    setError(errorMessage);\n  };\n\n  if (submitted) {\n    return (\n      <div className=\"max-w-md mx-auto mt-8 p-6 bg-green-50 border border-green-200 rounded-lg\">\n        <h2 className=\"text-xl font-semibold text-green-800 mb-2\">Request Submitted</h2>\n        <p className=\"text-green-700\">\n          Your account request has been submitted for approval. You will be notified once it's processed by an administrator.\n        </p>\n      </div>\n    );\n  }\n\n  return (\n    <div className=\"max-w-md mx-auto mt-8\">\n      <div className=\"bg-white p-6 rounded-lg shadow-md\">\n        <h2 className=\"text-2xl font-bold mb-6 text-center\">Request Account Access</h2>\n        \n        {error && (\n          <div className=\"mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700\">\n            {error}\n          </div>\n        )}\n        \n        <div className=\"mb-6\">\n          <GoogleSignInButton onSuccess={handleGoogleSuccess} onError={handleGoogleError} />\n        </div>\n        \n        <div className=\"relative mb-6\">\n          <div className=\"absolute inset-0 flex items-center\">\n            <div className=\"w-full border-t border-gray-300\" />\n          </div>\n          <div className=\"relative flex justify-center text-sm\">\n            <span className=\"px-2 bg-white text-gray-500\">Or register with email</span>\n          </div>\n        </div>\n        \n        <form onSubmit={handleSubmit} className=\"space-y-4\">\n          <div>\n            <label className=\"block text-sm font-medium text-gray-700 mb-1\">\n              Full Name\n            </label>\n            <input\n              type=\"text\"\n              required\n              value={formData.name}\n              onChange={(e) => setFormData({ ...formData, name: e.target.value })}\n              className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"\n            />\n          </div>\n\n          <div>\n            <label className=\"block text-sm font-medium text-gray-700 mb-1\">\n              Email Address\n            </label>\n            <input\n              type=\"email\"\n              required\n              value={formData.email}\n              onChange={(e) => setFormData({ ...formData, email: e.target.value })}\n              className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"\n            />\n          </div>\n\n          <div>\n            <label className=\"block text-sm font-medium text-gray-700 mb-1\">\n              Requested Role\n            </label>\n            <select\n              value={formData.role}\n              onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}\n              className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"\n            >\n              <option value=\"staff\">Staff</option>\n              <option value=\"admin\">Admin</option>\n            </select>\n          </div>\n\n          <button\n            type=\"submit\"\n            disabled={loading}\n            className=\"w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50\"\n          >\n            {loading ? 'Submitting...' : 'Submit Request'}\n          </button>\n        </form>\n\n        <div className=\"mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded\">\n          <p className=\"text-sm text-yellow-800\">\n            <strong>Note:</strong> All account requests must be approved by an administrator before access is granted.\n          </p>\n        </div>\n      </div>\n    </div>\n  );\n};
+import React, { useState } from 'react';
+import { authService, UserRole } from '../../lib/auth';
+import { GoogleSignInButton } from './GoogleSignInButton';
+
+export const UserRegistrationRequestWithGoogle: React.FC = () => {
+    const [formData, setFormData] = useState({
+        email: '',
+        name: '',
+        role: 'staff' as UserRole
+    });
+    const [loading, setLoading] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+
+        try {
+            await authService.requestUserCreation(formData.email, formData.name, formData.role);
+            setSubmitted(true);
+        } catch (error) {
+            console.error('Error submitting request:', error);
+            setError('Error submitting request. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleSuccess = () => {
+        setSubmitted(true);
+    };
+
+    const handleGoogleError = (errorMessage: string) => {
+        setError(errorMessage);
+    };
+
+    if (submitted) {
+        return (
+            <div className="max-w-md mx-auto mt-8 p-6 bg-green-50 border border-green-200 rounded-lg">
+                <h2 className="text-xl font-semibold text-green-800 mb-2">Request Submitted</h2>
+                <p className="text-green-700">
+                    Your account request has been submitted for approval. You will be notified once it's processed by an administrator.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="max-w-md mx-auto mt-8">
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <h2 className="text-2xl font-bold mb-6 text-center">Request Account Access</h2>
+
+                {error && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700">
+                        {error}
+                    </div>
+                )}
+
+                <div className="mb-6">
+                    <GoogleSignInButton onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
+                </div>
+
+                <div className="relative mb-6">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300" />
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                        <span className="px-2 bg-white text-gray-500">Or register with email</span>
+                    </div>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Full Name
+                        </label>
+                        <input
+                            id="google-registration-name"
+                            name="google-registration-name"
+                            type="text"
+                            required
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            autoComplete="name"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Email Address
+                        </label>
+                        <input
+                            id="google-registration-email"
+                            name="google-registration-email"
+                            type="email"
+                            required
+                            value={formData.email}
+                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            autoComplete="email"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Requested Role
+                        </label>
+                        <select
+                            id="google-registration-role"
+                            name="google-registration-role"
+                            value={formData.role}
+                            onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="staff">Staff</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                        {loading ? 'Submitting...' : 'Submit Request'}
+                    </button>
+                </form>
+
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                    <p className="text-sm text-yellow-800">
+                        <strong>Note:</strong> All account requests must be approved by an administrator before access is granted.
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+};

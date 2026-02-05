@@ -1,5 +1,5 @@
 // Detailed Financial Transaction System for Comprehensive Reporting
-// Based on Saint Francis of Assisi Friary actual format
+// Based on OFM South Province Phil actual format
 
 export interface DetailedTransaction {
     id: string;
@@ -233,8 +233,8 @@ export class DetailedFinancialReportService {
         const finalBalances = this.calculateFinalBalances(locationOfFunds);
 
         return {
-            friaryName: 'Saint Francis of Assisi Friary',
-            address: '2 Capricorn St., Pleasant Homes Subdivision, Punta Princesa, Cebu City',
+            friaryName: 'OFM South Province Phil',
+            address: 'Province of San Antonio de Padua, Philippines',
             reportPeriod: `${startDate.toLocaleDateString('en-US', { month: 'long' })} ${startDate.getFullYear()}`,
             reportDate: new Date(),
 
@@ -263,7 +263,7 @@ export class DetailedFinancialReportService {
 
             const transactions: DetailedTransaction[] = [];
 
-            // Sample transactions based on the provided Saint Francis of Assisi Friary format
+            // Sample transactions based on the provided OFM South Province Phil format
             const sampleTransactions: DetailedTransaction[] = [
                 // January 2022 Sample Receipt Transactions
                 {
@@ -986,7 +986,7 @@ export class DetailedFinancialReportService {
     }
 
     private static async getCashFlowRecords(startDate: Date, endDate: Date): Promise<CashFlowRecord[]> {
-        // Sample cash flow records based on the provided Saint Francis of Assisi Friary format
+        // Sample cash flow records based on the provided OFM South Province Phil format
         const records: CashFlowRecord[] = [
             {
                 id: 'cf_001',

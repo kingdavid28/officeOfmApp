@@ -45,8 +45,8 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({
         name: '',
         description: '',
         code: '',
-        managerId: '',
-        parentDepartmentId: '',
+        managerId: 'none',
+        parentDepartmentId: 'none',
         budget: {
             allocated: 0,
             currency: 'USD',
@@ -179,8 +179,8 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({
             name: '',
             description: '',
             code: '',
-            managerId: '',
-            parentDepartmentId: '',
+            managerId: 'none',
+            parentDepartmentId: 'none',
             budget: {
                 allocated: 0,
                 currency: 'USD',
@@ -203,8 +203,8 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({
                 name: formData.name,
                 description: formData.description,
                 code: formData.code,
-                managerId: formData.managerId || undefined,
-                parentDepartmentId: formData.parentDepartmentId || undefined,
+                managerId: formData.managerId && formData.managerId !== 'none' ? formData.managerId : undefined,
+                parentDepartmentId: formData.parentDepartmentId && formData.parentDepartmentId !== 'none' ? formData.parentDepartmentId : undefined,
                 budget: formData.budget.allocated > 0 ? {
                     allocated: formData.budget.allocated,
                     spent: 0,
@@ -234,8 +234,8 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({
             name: department.name,
             description: department.description || '',
             code: department.code || '',
-            managerId: department.managerId || '',
-            parentDepartmentId: department.parentDepartmentId || '',
+            managerId: department.managerId || 'none',
+            parentDepartmentId: department.parentDepartmentId || 'none',
             budget: {
                 allocated: department.budget?.allocated || 0,
                 currency: department.budget?.currency || 'USD',
@@ -254,8 +254,8 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({
                 name: formData.name,
                 description: formData.description,
                 code: formData.code,
-                managerId: formData.managerId || undefined,
-                parentDepartmentId: formData.parentDepartmentId || undefined,
+                managerId: formData.managerId && formData.managerId !== 'none' ? formData.managerId : undefined,
+                parentDepartmentId: formData.parentDepartmentId && formData.parentDepartmentId !== 'none' ? formData.parentDepartmentId : undefined,
                 budget: formData.budget.allocated > 0 ? {
                     ...editingDepartment.budget,
                     allocated: formData.budget.allocated,
@@ -368,7 +368,7 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({
                                 <SelectValue placeholder="Select manager" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">No manager</SelectItem>
+                                <SelectItem value="none">No manager</SelectItem>
                                 {users.map(user => (
                                     <SelectItem key={user.userId} value={user.userId}>
                                         {user.profile.firstName} {user.profile.lastName}
@@ -387,7 +387,7 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({
                                 <SelectValue placeholder="Select parent department" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">No parent (root department)</SelectItem>
+                                <SelectItem value="none">No parent (root department)</SelectItem>
                                 {departments
                                     .filter(dept => dept.id !== editingDepartment?.id)
                                     .map(dept => (

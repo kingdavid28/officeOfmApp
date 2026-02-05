@@ -60,7 +60,7 @@ export const ManualFinancialEntryForm: React.FC<ManualFinancialEntryFormProps> =
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
-        categoryId: '',
+        categoryId: 'none',
         type: 'receipt' as 'receipt' | 'disbursement',
         amount: '',
         description: '',
@@ -81,7 +81,11 @@ export const ManualFinancialEntryForm: React.FC<ManualFinancialEntryFormProps> =
 
         // Required fields
         MANUAL_ENTRY_VALIDATION.requiredFields.forEach(field => {
-            if (!formData[field as keyof typeof formData]) {
+            if (field === 'categoryId') {
+                if (!formData.categoryId || formData.categoryId === 'none') {
+                    newErrors.categoryId = 'Category selection is required';
+                }
+            } else if (!formData[field as keyof typeof formData]) {
                 newErrors[field] = `${field.replace(/([A-Z])/g, ' $1').toLowerCase()} is required`;
             }
         });
@@ -141,7 +145,7 @@ export const ManualFinancialEntryForm: React.FC<ManualFinancialEntryFormProps> =
             // Reset form
             setFormData({
                 date: new Date().toISOString().split('T')[0],
-                categoryId: '',
+                categoryId: 'none',
                 type: 'receipt',
                 amount: '',
                 description: '',
@@ -160,7 +164,7 @@ export const ManualFinancialEntryForm: React.FC<ManualFinancialEntryFormProps> =
         }
     };
 
-    const selectedCategory = availableCategories.find(cat => cat.id === formData.categoryId);
+    const selectedCategory = availableCategories.find(cat => cat.id === formData.categoryId && formData.categoryId !== 'none');
     const selectedEntryType = MANUAL_ENTRY_TYPES[formData.entryType];
     const amount = parseFloat(formData.amount);
     const requiresApproval = permissions.maxAmount && amount > permissions.maxAmount;
@@ -196,7 +200,7 @@ export const ManualFinancialEntryForm: React.FC<ManualFinancialEntryFormProps> =
                             <Select
                                 value={formData.type}
                                 onValueChange={(value: 'receipt' | 'disbursement') =>
-                                    setFormData({ ...formData, type: value, categoryId: '' })
+                                    setFormData({ ...formData, type: value, categoryId: 'none' })
                                 }
                             >
                                 <SelectTrigger>
@@ -298,6 +302,7 @@ export const ManualFinancialEntryForm: React.FC<ManualFinancialEntryFormProps> =
                                 <SelectValue placeholder="Select a category" />
                             </SelectTrigger>
                             <SelectContent>
+                                <SelectItem value="none">Select a category</SelectItem>
                                 {availableCategories.map((category) => (
                                     <SelectItem key={category.id} value={category.id}>
                                         <div className="space-y-1">

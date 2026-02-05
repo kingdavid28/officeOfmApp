@@ -1,0 +1,24 @@
+[
+    {
+        "origin": [
+            "https://officeofmapp.web.app",
+            "https://officeofmapp.firebaseapp.com"
+        ],
+        "method": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "HEAD",
+            "OPTIONS"
+        ],
+        "maxAgeSeconds": 3600,
+        "responseHeader": [
+            "Content-Type",
+            "Authorization",
+            "Content-Length",
+            "User-Agent",
+            "X-Requested-With"
+        ]
+    }
+]

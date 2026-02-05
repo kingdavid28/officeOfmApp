@@ -15,6 +15,10 @@ export interface UserPreferences {
 export const userPreferencesService = {
     // Get user preferences with defaults
     async getUserPreferences(userId: string): Promise<UserPreferences> {
+        if (!userId) {
+            throw new Error('User ID is required to get preferences');
+        }
+
         try {
             const docRef = doc(db, 'user_preferences', userId);
             const docSnap = await getDoc(docRef);
@@ -36,8 +40,14 @@ export const userPreferencesService = {
                 await setDoc(docRef, defaultPreferences);
                 return defaultPreferences;
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error getting user preferences:', error);
+
+            // If it's a permissions error, provide more context
+            if (error?.code === 'permission-denied') {
+                console.error('Permission denied accessing user preferences. Check Firestore rules.');
+            }
+
             // Return safe defaults on error
             return {
                 uid: userId,

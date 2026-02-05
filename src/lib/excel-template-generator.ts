@@ -40,7 +40,7 @@ export class ExcelTemplateGenerator {
         // Header Section
         template.push([
             {
-                value: 'Saint Francis of Assisi Friary',
+                value: 'OFM South Province Phil',
                 style: {
                     font: { bold: true, size: 14 },
                     alignment: { horizontal: 'center' }
@@ -51,7 +51,7 @@ export class ExcelTemplateGenerator {
 
         template.push([
             {
-                value: '2 Capricorn St., Pleasant Homes Subdivision, Punta Princesa, Cebu City',
+                value: 'Province of San Antonio de Padua, Philippines',
                 style: {
                     font: { size: 10 },
                     alignment: { horizontal: 'center' }
@@ -473,7 +473,7 @@ export class ExcelTemplateGenerator {
         // Header Section
         template.push([
             {
-                value: 'Saint Francis of Assisi Friary',
+                value: 'OFM South Province Phil',
                 style: {
                     font: { bold: true, size: 14 },
                     alignment: { horizontal: 'center' }

@@ -53,7 +53,7 @@ export const DetailedTransactionEntryForm: React.FC<DetailedTransactionEntryForm
         date: new Date().toISOString().split('T')[0],
         particulars: '',
         amount: '',
-        categoryId: '',
+        categoryId: 'none',
         subcategoryBreakdown: {} as Record<string, number>
     });
 
@@ -68,7 +68,7 @@ export const DetailedTransactionEntryForm: React.FC<DetailedTransactionEntryForm
             date: new Date().toISOString().split('T')[0],
             particulars: '',
             amount: '',
-            categoryId: '',
+            categoryId: 'none',
             subcategoryBreakdown: {}
         });
         setErrors({});
@@ -86,7 +86,7 @@ export const DetailedTransactionEntryForm: React.FC<DetailedTransactionEntryForm
             newErrors.amount = 'Valid amount is required';
         }
 
-        if (!formData.categoryId) {
+        if (!formData.categoryId || formData.categoryId === 'none') {
             newErrors.categoryId = 'Category selection is required';
         }
 
@@ -200,7 +200,7 @@ export const DetailedTransactionEntryForm: React.FC<DetailedTransactionEntryForm
                             variant={transactionType === 'receipt' ? 'default' : 'outline'}
                             onClick={() => {
                                 setTransactionType('receipt');
-                                setFormData(prev => ({ ...prev, categoryId: '' }));
+                                setFormData(prev => ({ ...prev, categoryId: 'none' }));
                             }}
                             className="flex-1"
                         >
@@ -212,7 +212,7 @@ export const DetailedTransactionEntryForm: React.FC<DetailedTransactionEntryForm
                             variant={transactionType === 'disbursement' ? 'default' : 'outline'}
                             onClick={() => {
                                 setTransactionType('disbursement');
-                                setFormData(prev => ({ ...prev, categoryId: '' }));
+                                setFormData(prev => ({ ...prev, categoryId: 'none' }));
                             }}
                             className="flex-1"
                         >
@@ -283,6 +283,7 @@ export const DetailedTransactionEntryForm: React.FC<DetailedTransactionEntryForm
                                 <SelectValue placeholder="Select a category" />
                             </SelectTrigger>
                             <SelectContent>
+                                <SelectItem value="none">Select a category</SelectItem>
                                 {availableCategories.map((category) => (
                                     <SelectItem key={category.id} value={category.id}>
                                         <div className="flex flex-col">
@@ -304,7 +305,7 @@ export const DetailedTransactionEntryForm: React.FC<DetailedTransactionEntryForm
                     </div>
 
                     {/* Preview */}
-                    {formData.particulars && formData.amount && formData.categoryId && (
+                    {formData.particulars && formData.amount && formData.categoryId && formData.categoryId !== 'none' && (
                         <Card className="bg-gray-50">
                             <CardHeader>
                                 <CardTitle className="text-sm">Transaction Preview</CardTitle>

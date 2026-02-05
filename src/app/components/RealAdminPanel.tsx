@@ -751,30 +751,38 @@ export const RealAdminPanel: React.FC<RealAdminPanelProps> = ({ currentUserUid, 
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Full Name</label>
                       <input
+                        id="create-user-name"
+                        name="create-user-name"
                         type="text"
                         required
                         value={createUserData.name}
                         onChange={(e) => setCreateUserData({ ...createUserData, name: e.target.value })}
                         className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Enter full name"
+                        autoComplete="name"
                       />
                     </div>
 
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Email Address</label>
                       <input
+                        id="create-user-email"
+                        name="create-user-email"
                         type="email"
                         required
                         value={createUserData.email}
                         onChange={(e) => setCreateUserData({ ...createUserData, email: e.target.value })}
                         className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Enter email address"
+                        autoComplete="email"
                       />
                     </div>
 
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Password</label>
                       <input
+                        id="create-user-password"
+                        name="create-user-password"
                         type="password"
                         required
                         value={createUserData.password}
@@ -782,6 +790,7 @@ export const RealAdminPanel: React.FC<RealAdminPanelProps> = ({ currentUserUid, 
                         className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Enter password"
                         minLength={6}
+                        autoComplete="new-password"
                       />
                     </div>
 

@@ -19,7 +19,7 @@ import { PendingUser } from './types';
 const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'superadmin@office.com';
 const SUPER_ADMIN_PASSWORD = import.meta.env.VITE_SUPER_ADMIN_PASSWORD || 'SuperAdmin123!';
 
-export type UserRole = 'super_admin' | 'admin' | 'staff';
+export type UserRole = 'super_admin' | 'vice_super_admin' | 'admin' | 'vice_admin' | 'provincial_treasurer' | 'treasurer' | 'staff' | 'guest';
 
 export interface UserProfile {
   uid: string;
@@ -64,31 +64,53 @@ export const authService = {
 
       console.log('Starting Google Sign-In...');
 
-      // Try popup first, fallback to redirect if it fails
-      try {
-        console.log('Attempting popup sign-in...');
-        const result = await signInWithPopup(auth, provider);
-        console.log('Popup sign-in successful:', result.user.email);
+      // Check if we're in a deployed environment (not localhost)
+      const isDeployed = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
 
-        // For popup, we need to handle the result differently
-        // Don't process immediately, let the caller handle it
-        return result;
-      } catch (popupError: any) {
-        console.log('Popup failed, trying redirect:', popupError.code);
+      if (isDeployed) {
+        // For deployed environments, prefer popup to avoid redirect issues
+        try {
+          console.log('Deployed environment: attempting popup sign-in...');
+          const result = await signInWithPopup(auth, provider);
+          console.log('Popup sign-in successful:', result.user.email);
+          return result;
+        } catch (popupError: any) {
+          console.log('Popup failed in deployed environment:', popupError.code);
 
-        // Common popup failure codes that should fallback to redirect
-        if (
-          popupError.code === 'auth/popup-blocked' ||
-          popupError.code === 'auth/popup-closed-by-user' ||
-          popupError.code === 'auth/cancelled-popup-request' ||
-          popupError.message?.includes('popup')
-        ) {
-          console.log('Using redirect method...');
-          await signInWithRedirect(auth, provider);
-          return null; // Redirect will handle the rest
-        } else {
-          // Re-throw other errors
+          // If popup fails in deployed environment, show user-friendly error
+          if (
+            popupError.code === 'auth/popup-blocked' ||
+            popupError.code === 'auth/popup-closed-by-user' ||
+            popupError.code === 'auth/cancelled-popup-request'
+          ) {
+            throw new Error('Please allow popups for this site and try again, or use email/password sign-in instead.');
+          }
           throw popupError;
+        }
+      } else {
+        // For local development, try popup first, fallback to redirect
+        try {
+          console.log('Local environment: attempting popup sign-in...');
+          const result = await signInWithPopup(auth, provider);
+          console.log('Popup sign-in successful:', result.user.email);
+          return result;
+        } catch (popupError: any) {
+          console.log('Popup failed, trying redirect:', popupError.code);
+
+          // Common popup failure codes that should fallback to redirect
+          if (
+            popupError.code === 'auth/popup-blocked' ||
+            popupError.code === 'auth/popup-closed-by-user' ||
+            popupError.code === 'auth/cancelled-popup-request' ||
+            popupError.message?.includes('popup')
+          ) {
+            console.log('Using redirect method...');
+            await signInWithRedirect(auth, provider);
+            return null; // Redirect will handle the rest
+          } else {
+            // Re-throw other errors
+            throw popupError;
+          }
         }
       }
     } catch (error) {
@@ -163,15 +185,20 @@ export const authService = {
       throw new Error('A request for this email is already pending approval.');
     }
 
-    const pendingUser: Omit<PendingUser, 'id'> = {
+    // Build pending user object, only including requestedAdminId if it has a value
+    const pendingUser: any = {
       email,
       name,
       role,
       requestedAt: new Date(),
       status: 'pending',
-      authProvider: 'google',
-      requestedAdminId: role === 'staff' ? requestedAdminId : undefined
+      authProvider: 'google'
     };
+
+    // Only add requestedAdminId if it's provided and role is staff
+    if (role === 'staff' && requestedAdminId) {
+      pendingUser.requestedAdminId = requestedAdminId;
+    }
 
     const docRef = await addDoc(collection(db, 'pending_users'), pendingUser);
     return docRef.id;
@@ -188,15 +215,20 @@ export const authService = {
       throw new Error('A request for this email is already pending approval.');
     }
 
-    const pendingUser: Omit<PendingUser, 'id'> = {
+    // Build pending user object, only including requestedAdminId if it has a value
+    const pendingUser: any = {
       email,
       name,
       role,
       requestedAt: new Date(),
       status: 'pending',
-      authProvider: 'email',
-      requestedAdminId: role === 'staff' ? requestedAdminId : undefined
+      authProvider: 'email'
     };
+
+    // Only add requestedAdminId if it's provided and role is staff
+    if (role === 'staff' && requestedAdminId) {
+      pendingUser.requestedAdminId = requestedAdminId;
+    }
 
     const docRef = await addDoc(collection(db, 'pending_users'), pendingUser);
     return docRef.id;

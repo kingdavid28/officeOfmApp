@@ -1,28 +1,52 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Public files - readable by all authenticated users
-    match /public/{userId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+    // User-organized file storage (Recommended structure)
+    match /users/{userId}/{category}/{fileName} {
+      allow read: if request.auth != null && 
+        (request.auth.uid == userId || hasAdminRole());
+      allow write: if request.auth != null && 
+        request.auth.uid == userId &&
+        isValidFileType() &&
+        isValidFileSize();
       allow delete: if request.auth != null && 
-        (request.auth.uid == userId || 
-         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin');
+        (request.auth.uid == userId || hasAdminRole());
     }
 
-    // Staff files - readable by authenticated users
-    match /staff/{userId}/{fileName} {
+    // Shared organizational files (accessible to all authenticated users)
+    match /organization/{category}/{fileName} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && 
-        (request.auth.uid == userId || 
-         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      allow write: if request.auth != null && hasStaffRole();
+      allow delete: if request.auth != null && hasAdminRole();
     }
 
-    // Admin files - only admins can access
-    match /admin/{userId}/{fileName} {
-      allow read, write, delete: if request.auth != null && 
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // Legacy category-based storage (for backward compatibility)
+    match /{category}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+      allow delete: if request.auth != null && hasAdminRole();
+    }
+
+    // Helper functions
+    function hasAdminRole() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
+    }
+    
+    function hasStaffRole() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['staff', 'admin', 'super_admin'];
+    }
+    
+    function isValidFileType() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/vnd.ms-excel') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.*') ||
+             request.resource.contentType.matches('application/msword') ||
+             request.resource.contentType.matches('image/.*') ||
+             request.resource.contentType.matches('text/.*');
+    }
+    
+    function isValidFileSize() {
+      return request.resource.size < 50 * 1024 * 1024; // 50MB limit
     }
   }
 }

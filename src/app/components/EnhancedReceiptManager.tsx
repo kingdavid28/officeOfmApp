@@ -125,8 +125,10 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
     const [previewUrl, setPreviewUrl] = useState<string>('');
 
     useEffect(() => {
-        loadData();
-        loadUserPreferences();
+        if (currentUserId) {
+            loadData();
+            loadUserPreferences();
+        }
     }, [currentUserId]);
 
     useEffect(() => {
@@ -135,12 +137,20 @@ export const EnhancedReceiptManager: React.FC<EnhancedReceiptManagerProps> = ({
     }, [currentViewScope]);
 
     const loadUserPreferences = async () => {
+        if (!currentUserId) {
+            console.warn('Cannot load user preferences: currentUserId is not available');
+            return;
+        }
+
         try {
             const preferences = await userPreferencesService.getUserPreferences(currentUserId);
             setCurrentViewScope(preferences.receiptViewScope);
             setAIDashboardViewScope(preferences.aiDashboardViewScope);
         } catch (error) {
             console.error('Error loading user preferences:', error);
+            // Set default values on error
+            setCurrentViewScope('all');
+            setAIDashboardViewScope('all');
         }
     };
 

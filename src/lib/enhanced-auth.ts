@@ -1,7 +1,7 @@
-import { 
-  signInWithEmailAndPassword, 
+import {
+  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut, 
+  signOut,
   onAuthStateChanged,
   User,
   GoogleAuthProvider,
@@ -12,7 +12,7 @@ import { doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, updateD
 import { auth, db } from './firebase';
 import { PendingUser } from './types';
 
-export type UserRole = 'super_admin' | 'admin' | 'staff';
+export type UserRole = 'super_admin' | 'vice_super_admin' | 'admin' | 'vice_admin' | 'provincial_treasurer' | 'treasurer' | 'staff' | 'guest';
 export type UserStatus = 'active' | 'disabled' | 'pending';
 
 export interface UserProfile {
@@ -45,12 +45,12 @@ class AuthService {
   async signIn(email: string, password: string) {
     const result = await signInWithEmailAndPassword(auth, email, password);
     const profile = await this.getUserProfile(result.user.uid);
-    
+
     if (profile?.status === 'disabled') {
       await signOut(auth);
       throw new Error('Account has been disabled. Contact administrator.');
     }
-    
+
     await this.updateLastLogin(result.user.uid);
     await this.logAuditAction('user_login', result.user.uid, result.user.email!, result.user.uid, result.user.email!, {});
     return result;
@@ -62,9 +62,9 @@ class AuthService {
       provider.addScope('email');
       provider.addScope('profile');
       const result = await signInWithPopup(auth, provider);
-      
+
       let profile = await this.getUserProfile(result.user.uid);
-      
+
       if (!profile) {
         const pendingUser: Omit<PendingUser, 'id'> = {
           email: result.user.email!,
@@ -73,17 +73,17 @@ class AuthService {
           requestedAt: new Date(),
           status: 'pending'
         };
-        
+
         await addDoc(collection(db, 'pending_users'), pendingUser);
         await signOut(auth);
         throw new Error('Account request submitted for approval. Please wait for admin approval.');
       }
-      
+
       if (profile.status === 'disabled') {
         await signOut(auth);
         throw new Error('Account has been disabled. Contact administrator.');
       }
-      
+
       await this.updateLastLogin(result.user.uid);
       return result;
     } catch (error) {
@@ -96,9 +96,9 @@ class AuthService {
   async createUser(email: string, password: string, name: string, role: UserRole, createdBy: string) {
     // Use Firebase Admin SDK in production to avoid session interruption
     const result = await createUserWithEmailAndPassword(auth, email, password);
-    
+
     const creatorProfile = await this.getUserProfile(createdBy);
-    
+
     const profile: UserProfile = {
       uid: result.user.uid,
       email,
@@ -110,39 +110,39 @@ class AuthService {
       approvedBy: createdBy,
       approvedAt: new Date()
     };
-    
+
     await setDoc(doc(db, 'users', result.user.uid), profile);
-    
+
     await this.logAuditAction(
-      'user_created', 
-      result.user.uid, 
-      email, 
-      createdBy, 
+      'user_created',
+      result.user.uid,
+      email,
+      createdBy,
       creatorProfile?.email || 'unknown',
       { role, name }
     );
-    
+
     // Sign out newly created user to restore admin session
     await signOut(auth);
-    
+
     return result;
   }
 
   async updateUserRole(userId: string, newRole: UserRole, updatedBy: string) {
     const userProfile = await this.getUserProfile(userId);
     const updaterProfile = await this.getUserProfile(updatedBy);
-    
+
     if (!userProfile) throw new Error('User not found');
     if (userProfile.role === 'super_admin') throw new Error('Cannot modify super admin role');
-    
+
     const oldRole = userProfile.role;
-    
+
     await updateDoc(doc(db, 'users', userId), {
       role: newRole,
       updatedAt: new Date(),
       updatedBy: updatedBy
     });
-    
+
     await this.logAuditAction(
       'role_changed',
       userId,
@@ -156,18 +156,18 @@ class AuthService {
   async updateUserStatus(userId: string, status: UserStatus, updatedBy: string) {
     const userProfile = await this.getUserProfile(userId);
     const updaterProfile = await this.getUserProfile(updatedBy);
-    
+
     if (!userProfile) throw new Error('User not found');
     if (userProfile.role === 'super_admin') throw new Error('Cannot modify super admin status');
-    
+
     const oldStatus = userProfile.status;
-    
+
     await updateDoc(doc(db, 'users', userId), {
       status,
       updatedAt: new Date(),
       updatedBy: updatedBy
     });
-    
+
     await this.logAuditAction(
       'status_changed',
       userId,
@@ -181,15 +181,15 @@ class AuthService {
   async updateUserProfile(userId: string, updates: Partial<Pick<UserProfile, 'name' | 'email'>>, updatedBy: string) {
     const userProfile = await this.getUserProfile(userId);
     const updaterProfile = await this.getUserProfile(updatedBy);
-    
+
     if (!userProfile) throw new Error('User not found');
-    
+
     await updateDoc(doc(db, 'users', userId), {
       ...updates,
       updatedAt: new Date(),
       updatedBy: updatedBy
     });
-    
+
     await this.logAuditAction(
       'profile_updated',
       userId,
@@ -202,9 +202,9 @@ class AuthService {
 
   async resetUserPassword(email: string, resetBy: string) {
     await sendPasswordResetEmail(auth, email);
-    
+
     const resetterProfile = await this.getUserProfile(resetBy);
-    
+
     await this.logAuditAction(
       'password_reset_sent',
       undefined,
@@ -219,12 +219,12 @@ class AuthService {
   async approveUser(pendingUserId: string, password: string, approverUid: string) {
     const pendingDoc = await getDoc(doc(db, 'pending_users', pendingUserId));
     if (!pendingDoc.exists()) throw new Error('Pending user not found');
-    
+
     const pendingUser = pendingDoc.data() as PendingUser;
     if (pendingUser.status !== 'pending') throw new Error('User request already processed');
-    
+
     const result = await createUserWithEmailAndPassword(auth, pendingUser.email, password);
-    
+
     const profile: UserProfile = {
       uid: result.user.uid,
       email: pendingUser.email,
@@ -236,15 +236,15 @@ class AuthService {
       approvedBy: approverUid,
       approvedAt: new Date()
     };
-    
+
     await setDoc(doc(db, 'users', result.user.uid), profile);
-    
+
     await updateDoc(doc(db, 'pending_users', pendingUserId), {
       status: 'approved',
       approvedBy: approverUid,
       approvedAt: new Date()
     });
-    
+
     const approverProfile = await this.getUserProfile(approverUid);
     await this.logAuditAction(
       'user_approved',
@@ -254,7 +254,7 @@ class AuthService {
       approverProfile?.email || 'unknown',
       { role: pendingUser.role, name: pendingUser.name }
     );
-    
+
     await signOut(auth);
     return result;
   }
@@ -270,7 +270,7 @@ class AuthService {
       timestamp: new Date(),
       details
     };
-    
+
     await addDoc(collection(db, 'audit_logs'), {
       ...auditEntry,
       timestamp: serverTimestamp()
@@ -318,13 +318,13 @@ class AuthService {
   // Legacy methods for compatibility
   async requestUserCreation(email: string, name: string, role: UserRole = 'staff') {
     if (role === 'super_admin') throw new Error('Super admin accounts cannot be requested');
-    
+
     const pendingUser: Omit<PendingUser, 'id'> = {
       email, name, role,
       requestedAt: new Date(),
       status: 'pending'
     };
-    
+
     const docRef = await addDoc(collection(db, 'pending_users'), pendingUser);
     return docRef.id;
   }
@@ -341,9 +341,9 @@ class AuthService {
   async deleteUser(userId: string, deletedBy: string) {
     const userProfile = await this.getUserProfile(userId);
     if (userProfile?.role === 'super_admin') throw new Error('Cannot delete super admin');
-    
+
     await deleteDoc(doc(db, 'users', userId));
-    
+
     const deleterProfile = await this.getUserProfile(deletedBy);
     await this.logAuditAction(
       'user_deleted',

@@ -33,7 +33,9 @@ service cloud.firestore {
 
     // Pending users collection - for registration approval
     match /pending_users/{pendingId} {
-      allow read: if isAuthenticated() && isAdmin();
+      // Allow anyone to check for duplicate pending requests (for their own email)
+      // Allow admins to read all pending requests
+      allow read: if true; // Allow reading for duplicate check during registration
       allow create: if true; // Allow anonymous registration requests
       allow update: if isAdmin();
       allow delete: if isAdmin();
@@ -41,7 +43,7 @@ service cloud.firestore {
 
     // Pending organizations collection
     match /pending_organizations/{pendingId} {
-      allow read: if isAdmin();
+      allow read: if true; // Allow reading for duplicate check during registration
       allow create: if true; // Allow anonymous organization requests
       allow update: if isAdmin();
       allow delete: if isAdmin();
@@ -53,6 +55,32 @@ service cloud.firestore {
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isSuperAdmin();
+      
+      // Organization members subcollection
+      match /members/{userId} {
+        // Anyone authenticated can read members (to check roles and permissions)
+        allow read: if isAuthenticated();
+        
+        // Only super admins and organization admins can write
+        allow write: if isAuthenticated() && (
+          isSuperAdmin() ||
+          getUserRole() in ['super_admin', 'vice_super_admin'] ||
+          exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'org_admin'
+        );
+      }
+    }
+    
+    // User organization memberships - for quick lookup
+    match /userOrganizationMemberships/{userId} {
+      // Users can read their own memberships
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      
+      // Only system can write (via organization role assignment)
+      allow write: if isAuthenticated() && (
+        isSuperAdmin() ||
+        getUserRole() in ['super_admin', 'vice_super_admin']
+      );
     }
 
     // Tasks collection - user and admin access
@@ -71,12 +99,46 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Files collection - user and admin access
+    // Files collection - organization-based access for super admin file management
     match /files/{fileId} {
-      allow read: if isAuthenticated();
+      // Super admins can read all files
+      // Organization admins can read files from their organizations
+      // Regular users can read files they uploaded or files without organization restriction
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        !exists(/databases/$(database)/documents/files/$(fileId)) ||
+        !('organizationId' in resource.data) ||
+        resource.data.uploadedBy == request.auth.uid ||
+        (
+          'organizationId' in resource.data &&
+          exists(/databases/$(database)/documents/organizations/$(resource.data.organizationId)/members/$(request.auth.uid))
+        )
+      );
+      
+      // Anyone authenticated can create files
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (isAdmin() || resource.data.uploadedBy == request.auth.uid);
-      allow delete: if isAuthenticated() && (isAdmin() || resource.data.uploadedBy == request.auth.uid);
+      
+      // Super admins, organization admins, and file uploaders can update
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.uploadedBy == request.auth.uid ||
+        (
+          'organizationId' in resource.data &&
+          exists(/databases/$(database)/documents/organizations/$(resource.data.organizationId)/members/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/organizations/$(resource.data.organizationId)/members/$(request.auth.uid)).data.role == 'org_admin'
+        )
+      );
+      
+      // Super admins, organization admins, and file uploaders can delete
+      allow delete: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.uploadedBy == request.auth.uid ||
+        (
+          'organizationId' in resource.data &&
+          exists(/databases/$(database)/documents/organizations/$(resource.data.organizationId)/members/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/organizations/$(resource.data.organizationId)/members/$(request.auth.uid)).data.role == 'org_admin'
+        )
+      );
     }
 
     // Audit logs - admin read only
@@ -104,6 +166,130 @@ service cloud.firestore {
     // Sync metadata - user-specific
     match /sync_metadata/{userId} {
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User preferences - user-specific
+    match /user_preferences/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Manual financial entries - role-based access
+    match /manual_financial_entries/{entryId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.createdBy == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.createdBy == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // Financial transactions - role-based access
+    match /financial_transactions/{transactionId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.createdBy == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.createdBy == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // Chat messages - user-specific
+    match /chat_messages/{messageId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow delete: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.userId);
+    }
+
+    // Document embeddings - admin access for AI features
+    match /document_embeddings/{embeddingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Approved Google users - admin access
+    match /approved_google_users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Receipt categories - system configuration
+    match /receipt_categories/{categoryId} {
+      allow read: if true; // Public read for categories
+      allow write: if isAdmin(); // Only admins can modify categories
+    }
+
+    // System configuration - admin access
+    match /system_config/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Application metadata - system initialization
+    match /app_metadata/{metadataId} {
+      allow read: if true; // Public read for app metadata
+      allow write: if isAdmin(); // Only admins can modify
+    }
+
+    // Security logs - super admin only
+    match /security_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow write: if false; // Server-side only
+    }
+
+    // Security alerts - super admin only
+    match /security_alerts/{alertId} {
+      allow read: if isSuperAdmin();
+      allow write: if false; // Server-side only
+    }
+
+    // Detailed transactions - role-based access
+    match /detailed_transactions/{transactionId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.createdBy == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.createdBy == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // Organization departments - nested collection
+    match /organizations/{orgId}/departments/{deptId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Organization audit logs - nested collection
+    match /organizations/{orgId}/audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Friaries collection - organizational structure
+    match /friaries/{friaryId} {
+      // Anyone authenticated can read friaries
+      allow read: if isAuthenticated();
+      
+      // Only Provincial Minister (super_admin) and Vice Provincial (vice_super_admin) can create/update/delete
+      allow create, update, delete: if isAuthenticated() && getUserRole() in ['super_admin', 'vice_super_admin'];
+    }
+
+    // Ministries collection - friary ministries
+    match /ministries/{ministryId} {
+      // Anyone authenticated can read ministries
+      allow read: if isAuthenticated();
+      
+      // Admins and ministry coordinators can update
+      allow create, update, delete: if isAuthenticated() && (
+        getUserRole() in ['super_admin', 'vice_super_admin', 'admin', 'vice_admin'] ||
+        resource.data.coordinator == request.auth.uid
+      );
+    }
+
+    // File content cache - for AI search
+    match /file_content_cache/{cacheId} {
+      // Anyone authenticated can read cache (for AI search)
+      allow read: if isAuthenticated();
+      
+      // System can write cache (server-side or client-side extraction)
+      allow create, update: if isAuthenticated();
+      
+      // Only admins can delete cache
+      allow delete: if isAdmin();
     }
 
     // Default deny all other collections

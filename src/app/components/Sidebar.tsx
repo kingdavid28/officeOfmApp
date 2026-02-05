@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from './ui/utils';
-import { LayoutDashboard, ListChecks, Receipt, FolderOpen, Users, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, ListChecks, Receipt, FolderOpen, Users, MessageCircle, Brain, DollarSign, Building2 } from 'lucide-react';
 import { Button } from './ui/button';
 import logoImage from '../../assets/bb626b016a1517c6cfff6c8c45abb0b9ac8e523c.png';
 
@@ -13,6 +13,9 @@ interface SidebarProps {
 
 const navigation = [
   { name: 'Dashboard', view: 'dashboard', icon: LayoutDashboard },
+  { name: 'Organization', view: 'organization', icon: Building2 },
+  { name: 'Finance', view: 'finance', icon: DollarSign },
+  { name: 'AI Assistant', view: 'ai-assistant', icon: Brain },
   { name: 'Tasks', view: 'tasks', icon: ListChecks },
   { name: 'Receipts', view: 'receipts', icon: Receipt },
   { name: 'Files', view: 'files', icon: FolderOpen },
@@ -41,9 +44,9 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose }: SidebarP
         <div className="flex h-full flex-col">
           {/* Logo */}
           <div className="flex h-16 items-center gap-3 border-b px-6">
-            <img 
-              src={logoImage} 
-              alt="Province Logo" 
+            <img
+              src={logoImage}
+              alt="Province Logo"
               className="h-10 w-10 object-contain"
             />
             <div className="flex flex-col">
@@ -57,7 +60,7 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose }: SidebarP
             {navigation.map((item) => {
               const Icon = item.icon;
               const isActive = currentView === item.view;
-              
+
               return (
                 <Button
                   key={item.view}

@@ -5,6 +5,8 @@ import { AppProvider } from './contexts/AppContext';
 import { LoginPage } from './components/LoginPage';
 import { CompleteRegistrationPage } from './components/CompleteRegistrationPage';
 import { PendingApprovalPage } from './components/PendingApprovalPage';
+import { PublicLandingPage } from './components/PublicLandingPage';
+import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { ToastContainer } from './components/ToastContainer';
 import { useToast } from './hooks/useToast';
 import { Header } from './components/Header';
@@ -15,6 +17,10 @@ import { ReceiptManager } from './components/ReceiptManager';
 import { EnhancedReceiptManager } from './components/EnhancedReceiptManager';
 import { FileManager } from './components/FileManager';
 import { EmployeeDirectory } from './components/EmployeeDirectory';
+import { FloatingChatButton } from './components/AIChatInterface';
+import { AIDashboard } from './components/AIDashboard';
+import { FinanceDashboard } from './components/FinanceDashboard';
+import { OrganizationalChart } from './components/OrganizationalChart';
 import MessagingPage from './components/MessagingPage';
 import { Skeleton } from './components/ui/skeleton';
 
@@ -23,6 +29,7 @@ function AppContent() {
   const [currentView, setCurrentView] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(window.location.pathname);
+  const [showLogin, setShowLogin] = useState(false);
   const toast = useToast();
 
   // Listen for navigation changes
@@ -33,6 +40,19 @@ function AppContent() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Handle routing for public pages
+  if (currentPage === '/privacy') {
+    return (
+      <>
+        <PrivacyPolicyPage onBackClick={() => {
+          window.history.pushState({}, '', '/');
+          setCurrentPage('/');
+        }} />
+        <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
+      </>
+    );
+  }
 
   if (loading) {
     return (
@@ -94,18 +114,40 @@ function AppContent() {
   }
 
   if (!user || !userProfile) {
-    return (
-      <>
-        <LoginPage />
-        <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
-      </>
-    );
+    // Show login page if user clicked sign in, otherwise show landing page
+    if (showLogin) {
+      return (
+        <>
+          <LoginPage />
+          <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
+        </>
+      );
+    } else {
+      return (
+        <>
+          <PublicLandingPage onSignInClick={() => setShowLogin(true)} />
+          <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
+        </>
+      );
+    }
   }
 
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
         return <Dashboard onNavigate={setCurrentView} />;
+      case 'organization':
+        return <OrganizationalChart onNavigate={setCurrentView} />;
+      case 'finance':
+        return <FinanceDashboard />;
+      case 'ai-assistant':
+        return (
+          <AIDashboard
+            currentUserId={userProfile.uid}
+            currentUserName={userProfile.name}
+            userRole={userProfile.role}
+          />
+        );
       case 'tasks':
         return <TaskManager />;
       case 'receipts':
@@ -146,6 +188,12 @@ function AppContent() {
       </div>
 
       <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
+
+      {/* AI Chat Assistant - Floating Button */}
+      <FloatingChatButton
+        currentUserId={userProfile.uid}
+        userRole={userProfile.role}
+      />
     </div>
   );
 }

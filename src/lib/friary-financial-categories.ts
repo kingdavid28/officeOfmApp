@@ -1,4 +1,4 @@
-// Friary Financial Categories based on Saint Francis of Assisi Friary accounting system
+// Friary Financial Categories based on OFM South Province Phil accounting system
 
 export interface FriaryFinancialCategory {
     id: string;

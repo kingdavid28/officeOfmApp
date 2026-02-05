@@ -34,8 +34,8 @@ export const FriaryFinancialReportGeneratorComponent: React.FC<FriaryFinancialRe
     const [report, setReport] = useState<FriaryFinancialReport | null>(null);
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [friaryInfo, setFriaryInfo] = useState({
-        name: 'Saint Francis of Assisi Friary',
-        address: '2 Capricorn St., Pleasant Homes Subdivision, Punta Princesa, Cebu City'
+        name: 'OFM South Province Phil',
+        address: 'Province of San Antonio de Padua, Philippines'
     });
 
     useEffect(() => {
@@ -45,8 +45,8 @@ export const FriaryFinancialReportGeneratorComponent: React.FC<FriaryFinancialRe
     const generateReport = async () => {
         setLoading(true);
         try {
-            // Get receipts data from the receipt service
-            const receipts = await receiptService.getReceipts();
+            // Get receipts data from the receipt service based on user role
+            const receipts = await receiptService.getVisibleReceipts(currentUserUid);
 
             // Get manual financial entries for the selected month
             const selectedDate = new Date(selectedMonth);
@@ -227,7 +227,7 @@ export const FriaryFinancialReportGeneratorComponent: React.FC<FriaryFinancialRe
                                 Friary Financial Report Generator
                             </CardTitle>
                             <p className="text-muted-foreground mt-1">
-                                Generate comprehensive financial reports following Saint Francis of Assisi Friary format
+                                Generate comprehensive financial reports following OFM South Province Phil format
                             </p>
                         </div>
                         <div className="flex items-center gap-2">

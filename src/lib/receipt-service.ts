@@ -55,19 +55,41 @@ export const receiptService = {
 
     async getCategories(): Promise<ReceiptCategory[]> {
         try {
-            const q = query(
-                collection(db, 'receipt_categories'),
-                where('isActive', '==', true),
-                orderBy('name')
-            );
-            const snapshot = await getDocs(q);
-            const categories = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            } as ReceiptCategory));
+            // Try the optimized query first (requires index)
+            try {
+                const q = query(
+                    collection(db, 'receipt_categories'),
+                    where('isActive', '==', true),
+                    orderBy('name')
+                );
+                const snapshot = await getDocs(q);
+                const categories = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as ReceiptCategory));
 
-            console.log(`Loaded ${categories.length} categories from database`);
-            return categories;
+                console.log(`Loaded ${categories.length} categories from database (optimized query)`);
+                return categories;
+            } catch (indexError) {
+                console.log('Index not ready, using fallback query...');
+
+                // Fallback: simple query without orderBy (no index required)
+                const q = query(
+                    collection(db, 'receipt_categories'),
+                    where('isActive', '==', true)
+                );
+                const snapshot = await getDocs(q);
+                const categories = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as ReceiptCategory));
+
+                // Sort in memory
+                categories.sort((a, b) => a.name.localeCompare(b.name));
+
+                console.log(`Loaded ${categories.length} categories from database (fallback query)`);
+                return categories;
+            }
         } catch (error) {
             console.error('Error loading categories:', error);
             return [];
